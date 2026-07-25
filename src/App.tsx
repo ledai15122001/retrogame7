@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { UiProvider } from '@/components/ui/UiProvider';
 import { CRTOverlay } from '@/components/ui/CRTOverlay';
+import { FireworkManager } from '@/components/ui/FireworkManager';
 import { BootScreen } from '@/components/ui/BootScreen';
 import { MascotJourney } from '@/components/ui/MascotJourney';
 import { Navbar } from '@/components/Navbar';
@@ -19,6 +20,7 @@ function App() {
 
   return (
     <UiProvider>
+      <FireworkManager />
       {!booted && <BootScreen onDone={() => setBooted(true)} />}
       <div style={{ opacity: booted ? 1 : 0, transition: 'opacity 0.5s ease' }}>
         <CRTOverlay />

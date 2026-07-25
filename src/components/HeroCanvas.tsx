@@ -35,15 +35,11 @@ interface Coin {
   phase: number;
   collected: boolean;
 }
-interface Particle {
+interface Firefly {
   x: number;
   y: number;
-  vx: number;
-  vy: number;
-  life: number;
-  maxLife: number;
-  color: string;
-  size: number;
+  phase: number;
+  speed: number;
 }
 
 export function HeroCanvas({ className = '' }: { className?: string }) {
@@ -57,8 +53,7 @@ export function HeroCanvas({ className = '' }: { className?: string }) {
     clouds: [] as Cloud[],
     birds: [] as Bird[],
     coins: [] as Coin[],
-    particles: [] as Particle[],
-    fireflies: [] as { x: number; y: number; phase: number; speed: number }[],
+    fireflies: [] as Firefly[],
     t: 0,
     grassPhase: 0,
     initW: 0,
@@ -264,47 +259,13 @@ export function HeroCanvas({ className = '' }: { className?: string }) {
       ctx.globalAlpha = 1;
     });
 
-    // ---------- burst particles (mouse interaction) ----------
-    s.particles = s.particles.filter((pt) => pt.life > 0);
-    s.particles.forEach((pt) => {
-      if (!reduced) {
-        pt.x += pt.vx * (dt / 16);
-        pt.y += pt.vy * (dt / 16);
-        pt.vy += 0.02;
-        pt.life -= dt;
-      }
-      const a = Math.max(0, pt.life / pt.maxLife);
-      ctx.fillStyle = pt.color;
-      ctx.globalAlpha = a;
-      ctx.fillRect(Math.round(pt.x), Math.round(pt.y), pt.size, pt.size);
-      ctx.globalAlpha = 1;
-    });
+    // ---------- burst particles (global firework overlay handles clicks) ----------
+    // (removed — see FireworkManager)
   }, true);
-
-  // spawn burst particles on click
-  const handleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const s = state.current;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / SCALE;
-    const y = (e.clientY - rect.top) / SCALE;
-    for (let i = 0; i < 10; i++) {
-      s.particles.push({
-        x,
-        y,
-        vx: (Math.random() - 0.5) * 2,
-        vy: (Math.random() - 1) * 2,
-        life: 600,
-        maxLife: 600,
-        color: Math.random() > 0.5 ? '#ffd23f' : '#ff5d8f',
-        size: 1 + Math.floor(Math.random() * 2),
-      });
-    }
-  };
 
   return (
     <canvas
       ref={canvasRef}
-      onClick={handleClick}
       className={`absolute inset-0 h-full w-full ${className}`}
       style={{ imageRendering: 'pixelated' }}
       aria-hidden
