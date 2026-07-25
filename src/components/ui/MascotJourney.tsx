@@ -183,7 +183,7 @@ export function MascotJourney() {
     <div
       className="mascot-journey pointer-events-none fixed inset-0 z-[900]"
       ref={wrapRef}
-      style={{ transition: 'opacity 0.5s ease' }}
+      style={{ transition: 'opacity 0.5s var(--ease-out-soft)' }}
       aria-hidden
     >
       <div
@@ -210,7 +210,7 @@ export function MascotJourney() {
             background: 'rgba(0,0,0,0.25)',
             borderRadius: '50%',
             filter: 'blur(2px)',
-            transition: 'transform 0.2s ease',
+            transition: 'transform var(--dur-fast) var(--ease-out-soft)',
           }}
         />
       </div>

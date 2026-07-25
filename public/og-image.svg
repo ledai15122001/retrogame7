@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" shape-rendering="crispEdges" width="1200" height="630">
+  <rect width="1200" height="630" fill="#161a44"/>
+  <rect x="0" y="0" width="1200" height="220" fill="#0d0f2b"/>
+  <!-- stars -->
+  <g fill="#ffe884">
+    <rect x="80" y="60" width="6" height="6"/>
+    <rect x="220" y="110" width="6" height="6"/>
+    <rect x="380" y="50" width="6" height="6"/>
+    <rect x="540" y="130" width="6" height="6"/>
+    <rect x="900" y="70" width="6" height="6"/>
+    <rect x="1060" y="120" width="6" height="6"/>
+    <rect x="980" y="160" width="6" height="6"/>
+  </g>
+  <!-- moon -->
+  <g>
+    <circle cx="1020" cy="150" r="46" fill="#ffe884"/>
+    <circle cx="1004" cy="138" r="36" fill="#161a44"/>
+  </g>
+  <!-- far hills -->
+  <path d="M0 470 Q 200 420 400 460 T 800 450 T 1200 470 L1200 630 L0 630 Z" fill="#2f6b34"/>
+  <!-- near grass -->
+  <rect x="0" y="520" width="1200" height="110" fill="#4f9a4f"/>
+  <rect x="0" y="600" width="1200" height="30" fill="#2f6b34"/>
+  <!-- coin buddy -->
+  <g transform="translate(420,250)">
+    <rect x="40" y="0" width="200" height="20" fill="#1a1530"/>
+    <rect x="20" y="20" width="240" height="20" fill="#1a1530"/>
+    <rect x="0" y="40" width="280" height="160" fill="#ffd23f"/>
+    <rect x="0" y="40" width="280" height="160" fill="none" stroke="#1a1530" stroke-width="20"/>
+    <rect x="40" y="40" width="240" height="40" fill="#ffe884"/>
+    <!-- eyes -->
+    <rect x="70" y="90" width="30" height="40" fill="#ffffff"/>
+    <rect x="180" y="90" width="30" height="40" fill="#ffffff"/>
+    <rect x="80" y="100" width="14" height="20" fill="#1a1530"/>
+    <rect x="190" y="100" width="14" height="20" fill="#1a1530"/>
+    <!-- mouth -->
+    <rect x="90" y="150" width="100" height="20" fill="#1a1530"/>
+    <rect x="100" y="160" width="80" height="10" fill="#ff5d8f"/>
+  </g>
+  <!-- title -->
+  <text x="600" y="120" font-family="'Press Start 2P', monospace" font-size="58" fill="#ffd23f" text-anchor="middle" style="paint-order:stroke;stroke:#1a1530;stroke-width:10px">$COINBUDDY</text>
+  <text x="600" y="180" font-family="'Press Start 2P', monospace" font-size="22" fill="#ff5d8f" text-anchor="middle">THE COOLEST COIN IN THE MEADOW</text>
+  <text x="600" y="560" font-family="'Press Start 2P', monospace" font-size="20" fill="#f5ead3" text-anchor="middle">TOUCH GRASS · PET THE COIN · NUMBER GO UP</text>
+</svg>

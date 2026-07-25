@@ -65,9 +65,9 @@ export default {
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
         popIn: {
-          '0%': { opacity: '0', transform: 'scale(0.7)' },
-          '70%': { transform: 'scale(1.06)' },
-          '100%': { opacity: '1', transform: 'scale(1)' },
+          '0%': { opacity: '0', transform: 'scale(0.92) translateY(6px)' },
+          '60%': { transform: 'scale(1.02) translateY(0)' },
+          '100%': { opacity: '1', transform: 'scale(1) translateY(0)' },
         },
         sparkle: {
           '0%,100%': { opacity: '0', transform: 'scale(0.4) rotate(0deg)' },
@@ -84,8 +84,8 @@ export default {
         sway: 'sway 3.5s ease-in-out infinite',
         twinkle: 'twinkle 2.6s ease-in-out infinite',
         drift: 'drift 40s linear infinite',
-        fadeUp: 'fadeUp 0.6s ease-out both',
-        popIn: 'popIn 0.4s ease-out both',
+        fadeUp: 'fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both',
+        popIn: 'popIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) both',
         sparkle: 'sparkle 1.8s ease-in-out infinite',
         flicker: 'flicker 4s linear infinite',
       },

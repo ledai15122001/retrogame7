@@ -7,14 +7,15 @@ import { COIN_FRONT, PALETTE } from '@/components/sprites/sprites';
 /**
  * Premium retro arcade power-on boot screen.
  *
- * Timeline (~4.0s total):
+ * Timeline (4.0s total):
  *   0.00s  fade in from black, scanlines + flicker, coin floats, "INSERT COIN" blinks
- *   0.80s  coin drops with gravity into the coin slot -> spark + shake + metallic sound
- *   1.20s  "INSERT COIN" out, "BOOTING ARCADE SYSTEM..." typewriter in
- *   1.50s  progress lines type out one by one; loading bar fills smoothly 0->100%
- *   3.50s  100% reached -> 300ms pause -> golden flash + slot glow + PING
- *   3.80s  "READY!" pops in with sparkle particles, holds ~400ms
- *   4.00s  crossfade out, hero revealed underneath
+ *   0.60s  coin drops with gravity into the coin slot -> spark + shake + metallic sound
+ *   0.90s  "INSERT COIN" out, "BOOTING ARCADE SYSTEM..." typewriter in
+ *   1.10s  progress lines type out one by one; loading bar fills smoothly 0->100%
+ *   2.90s  100% reached -> 300ms pause -> golden flash + slot glow + PING
+ *   3.25s  "READY!" pops in with sparkle particles, holds ~350ms
+ *   3.60s  crossfade out, hero revealed underneath
+ *   4.00s  unmount
  *
  * In DEV mode the boot screen always plays (no sessionStorage skip).
  * Respects prefers-reduced-motion (shortened to a quick fade).
@@ -34,14 +35,14 @@ const PROGRESS_LINES = [
 ];
 
 // timeline constants (ms)
-const T_COIN_DROP = 800;
-const T_BOOTING = 1200;
-const T_PROGRESS = 1500;
-const T_PROGRESS_END = 3500; // bar reaches 100% (fills over ~2s)
-const T_FLASH = 3800; // 300ms pause after 100%
-const T_READY = 3850; // READY! visible
-const T_FADE_OUT = 4250; // READY holds ~400ms then crossfade
-const T_DONE = 4600; // unmount
+const T_COIN_DROP = 600;
+const T_BOOTING = 900;
+const T_PROGRESS = 1100;
+const T_PROGRESS_END = 2900; // bar reaches 100% (fills over ~1.8s)
+const T_FLASH = 3200; // 300ms pause after 100%
+const T_READY = 3250; // READY! visible
+const T_FADE_OUT = 3600; // READY holds ~350ms then crossfade
+const T_DONE = 4000; // unmount — exactly 4.0s
 
 export function BootScreen({ onDone }: { onDone: () => void }) {
   const reduced = usePrefersReducedMotion();
@@ -244,8 +245,8 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
       className="boot-screen fixed inset-0 z-[10000] flex flex-col items-center justify-center bg-black"
       style={{
         opacity: exit ? 0 : 1,
-        transition: 'opacity 0.35s ease-out',
-        animation: 'boot-fade-in 0.5s ease-out both',
+        transition: 'opacity 0.4s var(--ease-out-soft)',
+        animation: 'boot-fade-in 0.45s var(--ease-out-soft) both',
       }}
       aria-hidden
     >

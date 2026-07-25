@@ -22,9 +22,12 @@ function App() {
     <UiProvider>
       <FireworkManager />
       {!booted && <BootScreen onDone={() => setBooted(true)} />}
-      <div style={{ opacity: booted ? 1 : 0, transition: 'opacity 0.5s ease' }}>
+      <div>
         <CRTOverlay />
         <MascotJourney />
+        <a href="#top" className="skip-link">
+          Skip to content
+        </a>
         <Navbar />
         <main className="relative">
           <Hero />

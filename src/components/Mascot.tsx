@@ -103,6 +103,16 @@ export function Mascot({ size = 3 }: { size?: number }) {
     }, 420);
   }, [jumping]);
 
+  const onKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+        e.preventDefault();
+        jump();
+      }
+    },
+    [jump]
+  );
+
   const onHover = useCallback(() => {
     setShowBubble(true);
     setBubbleMsg(MESSAGES[Math.floor(Math.random() * MESSAGES.length)]);
@@ -171,6 +181,10 @@ export function Mascot({ size = 3 }: { size?: number }) {
       onMouseEnter={onHover}
       onMouseLeave={() => setShowBubble(false)}
       onClick={jump}
+      onKeyDown={onKeyDown}
+      role="button"
+      tabIndex={0}
+      aria-label="Pet the coin buddy — click or press to make it jump"
     >
       {/* speech bubble */}
       {showBubble && (

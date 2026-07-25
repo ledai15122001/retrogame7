@@ -2,27 +2,86 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#161a44" />
+
     <title>$COINBUDDY — The Coolest Coin In The Meadow</title>
     <meta
       name="description"
-      content="A tiny pixel coin with a big heart. $COINBUDDY is a handcrafted retro meme coin living in a little meadow you can play with."
+      content="A tiny pixel coin with a big heart. $COINBUDDY is a handcrafted retro meme coin living in a little meadow you can play with. Touch grass. Pet the coin. Number go up."
     />
+    <meta name="robots" content="index,follow,max-image-preview:large" />
+    <meta name="author" content="The Meadow" />
+    <meta name="keywords" content="$COINBUDDY, COINBUDDY, meme coin, pixel coin, solana meme coin, retro meme, meadow coin, touch grass" />
+    <link rel="canonical" href="https://coinbuddy.lol/" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="$COINBUDDY" />
     <meta property="og:title" content="$COINBUDDY — The Coolest Coin In The Meadow" />
     <meta
       property="og:description"
       content="A charming pixel-world meme coin. Touch grass. Pet the coin. Number go up."
     />
-    <meta name="twitter:card" content="summary_large_image" />
+    <meta property="og:url" content="https://coinbuddy.lol/" />
+    <meta property="og:image" content="https://coinbuddy.lol/og-image.svg" />
+    <meta property="og:image:alt" content="$COINBUDDY pixel coin in a meadow" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
 
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="$COINBUDDY — The Coolest Coin In The Meadow" />
+    <meta
+      name="twitter:description"
+      content="A charming pixel-world meme coin. Touch grass. Pet the coin. Number go up."
+    />
+    <meta name="twitter:image" content="https://coinbuddy.lol/og-image.svg" />
+    <meta name="twitter:image:alt" content="$COINBUDDY pixel coin in a meadow" />
+
+    <!-- Icons / manifest -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" sizes="any" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
+
+    <!-- Fonts: preconnect + non-blocking preload (font-display: swap prevents CLS) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
+      rel="preload"
+      as="style"
       href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Space+Grotesk:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
     />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+      media="print"
+      onload="this.media='all'"
+    />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+      />
+    </noscript>
+
+    <!-- Structured data -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "$COINBUDDY",
+        "alternateName": "CoinBuddy",
+        "url": "https://coinbuddy.lol/",
+        "description": "A tiny pixel coin with a big heart. A handcrafted retro meme coin living in a little meadow you can play with.",
+        "genre": "Meme Coin",
+        "about": {
+          "@type": "Thing",
+          "name": "$COINBUDDY meme coin"
+        }
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

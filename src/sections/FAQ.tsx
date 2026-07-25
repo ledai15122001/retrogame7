@@ -64,15 +64,15 @@ export function FAQ() {
                       <span className="font-body text-base font-semibold text-cream sm:text-lg">{f.q}</span>
                     </span>
                     <span
-                      className="font-pixel text-gold transition-transform duration-200"
-                      style={{ transform: isOpen ? 'rotate(45deg)' : 'rotate(0deg)' }}
+                      className="font-pixel text-gold"
+                      style={{ transform: isOpen ? 'rotate(45deg)' : 'rotate(0deg)', transition: 'transform var(--dur-med) var(--ease-back)' }}
                     >
                       +
                     </span>
                   </button>
                   <div
-                    className="grid transition-all duration-300 ease-out"
-                    style={{ gridTemplateRows: isOpen ? '1fr' : '0fr' }}
+                    className="grid"
+                    style={{ gridTemplateRows: isOpen ? '1fr' : '0fr', transition: 'grid-template-rows var(--dur-med) var(--ease-out-soft)' }}
                   >
                     <div className="overflow-hidden">
                       <p className="px-4 pb-4 pl-12 font-body text-sm text-cream/85 sm:text-base">

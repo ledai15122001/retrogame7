@@ -42,11 +42,12 @@ export function Navbar() {
   return (
     <header className="fixed left-0 right-0 top-0 z-[1000] flex justify-center px-3 pt-3 sm:pt-4">
       <nav
-        className={`flex w-full max-w-6xl items-center justify-between gap-2 px-3 py-2 sm:px-5 sm:py-3 transition-all duration-300 ${
+        className={`flex w-full max-w-6xl items-center justify-between gap-2 px-3 py-2 sm:px-5 sm:py-3 ${
           scrolled
             ? 'bg-sky-400/95 pixel-border backdrop-blur'
             : 'bg-sky-400/60 pixel-border backdrop-blur'
         }`}
+        style={{ transition: 'background-color var(--dur-med) var(--ease-out-soft), box-shadow var(--dur-med) var(--ease-out-soft)' }}
       >
         {/* logo */}
         <a href="#top" className="flex items-center gap-2" aria-label="$COINBUDDY home">
@@ -113,9 +114,9 @@ export function Navbar() {
             aria-expanded={open}
           >
             <div className="flex flex-col gap-1">
-              <span className={`block h-0.5 w-5 bg-ink transition-all ${open ? 'translate-y-1.5 rotate-45' : ''}`} />
-              <span className={`block h-0.5 w-5 bg-ink transition-all ${open ? 'opacity-0' : ''}`} />
-              <span className={`block h-0.5 w-5 bg-ink transition-all ${open ? '-translate-y-1.5 -rotate-45' : ''}`} />
+              <span className={`block h-0.5 w-5 bg-ink ${open ? 'translate-y-1.5 rotate-45' : ''}`} style={{ transition: 'transform var(--dur-fast) var(--ease-back)' }} />
+              <span className={`block h-0.5 w-5 bg-ink ${open ? 'opacity-0' : ''}`} style={{ transition: 'opacity var(--dur-fast) var(--ease-out-soft)' }} />
+              <span className={`block h-0.5 w-5 bg-ink ${open ? '-translate-y-1.5 -rotate-45' : ''}`} style={{ transition: 'transform var(--dur-fast) var(--ease-back)' }} />
             </div>
           </button>
         </div>
