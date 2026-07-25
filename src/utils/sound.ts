@@ -74,6 +74,12 @@ export const sound = {
     blip(988, 0.05, 'square', 0.4);
     blip(1319, 0.1, 'square', 0.4, 0.04);
   },
+  /** metallic arcade coin dropping into a slot */
+  coinDrop() {
+    blip(1180, 0.05, 'triangle', 0.45);
+    blip(880, 0.07, 'square', 0.3, 0.03);
+    blip(150, 0.09, 'sine', 0.5, 0.02);
+  },
   /** mascot jump */
   jump() {
     blip(330, 0.16, 'square', 0.4, 0, 660);

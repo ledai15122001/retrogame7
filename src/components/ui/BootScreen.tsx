@@ -5,30 +5,43 @@ import { PixelSprite } from '@/components/sprites/PixelSprite';
 import { COIN_FRONT, PALETTE } from '@/components/sprites/sprites';
 
 /**
- * Arcade power-on boot screen.
- * Plays once per session (skipped on repeat visits via sessionStorage).
- * Sequence (total ~2s minimum):
- *   0.0s  fade in, INSERT COIN + coin visible, CRT flicker/scanlines, idle coin glow
- *   0.3s  "BOOTING ARCADE SYSTEM..."
- *   0.7s  progress lines appear one at a time with typewriter effect
- *   1.6s  progress bar reaches 100%
- *   1.8s  PING sound + gold flash around coin + coin sparkle
- *   1.9s  fade out begins
- *   2.0s  hero fully visible
- * The screen stays at least 2s even if the site loads sooner; if assets take
- * longer, transition waits for them. Cross-fade ~300ms into the hero.
+ * Premium retro arcade power-on boot screen.
+ *
+ * Timeline (~2.4s total):
+ *   0.00s  fade in from black, scanlines + flicker, coin floats, "INSERT COIN" blinks
+ *   0.40s  coin drops with gravity into the coin slot -> spark + shake + metallic sound
+ *   0.80s  "INSERT COIN" out, "BOOTING ARCADE SYSTEM..." typewriter in
+ *   1.00s  progress lines type out one by one; loading bar fills smoothly 0->100%
+ *   1.90s  100% reached -> 200ms pause -> golden flash + slot glow + PING
+ *   2.10s  "READY!" pops in with sparkle particles, holds ~250ms
+ *   2.35s  crossfade out, hero revealed underneath
+ *
+ * In DEV mode the boot screen always plays (no sessionStorage skip).
  * Respects prefers-reduced-motion (shortened to a quick fade).
+ * Audio is guarded: sounds only fire if the AudioContext can resume.
  */
 const SESSION_KEY = 'coinbuddy-booted';
 
-type Phase = 'insert' | 'booting' | 'progress' | 'ready' | 'done';
+type Phase = 'insert' | 'booting' | 'progress' | 'flash' | 'ready' | 'done';
 
 const PROGRESS_LINES = [
   '✓ Loading Pixel World...',
   '✓ Connecting Token...',
   '✓ Initializing Mascot...',
+  '✓ Loading Memes...',
+  '✓ Preparing Moon Mission...',
   '✓ Ready.',
 ];
+
+// timeline constants (ms)
+const T_COIN_DROP = 400;
+const T_BOOTING = 800;
+const T_PROGRESS = 1000;
+const T_PROGRESS_END = 1900; // bar reaches 100%
+const T_FLASH = 2100; // 200ms pause after 100%
+const T_READY = 2250; // READY! visible
+const T_FADE_OUT = 2350;
+const T_DONE = 2700; // unmount
 
 export function BootScreen({ onDone }: { onDone: () => void }) {
   const reduced = usePrefersReducedMotion();
@@ -36,17 +49,32 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
   const [progress, setProgress] = useState(0);
   const [typedLines, setTypedLines] = useState<string[]>([]);
   const [exit, setExit] = useState(false);
-  const [coinFlash, setCoinFlash] = useState(false);
-  const [coinSparkle, setCoinSparkle] = useState(false);
+  const [coinDropping, setCoinDropping] = useState(false);
+  const [coinY, setCoinY] = useState(0);
+  const [slotGlow, setSlotGlow] = useState(false);
+  const [showSpark, setShowSpark] = useState(false);
+  const [shake, setShake] = useState(0);
+  const [showFlash, setShowFlash] = useState(false);
+  const [showSparkles, setShowSparkles] = useState(false);
+
   const rafRef = useRef<number>(0);
-  const startRef = useRef<number>(0);
+  const barStartRef = useRef<number>(0);
   const doneRef = useRef(onDone);
-  const siteReadyRef = useRef<boolean>(true); // site loads synchronously here; flip if needed
   doneRef.current = onDone;
 
-  // Skip entirely on repeat visits in the same session.
+  // audio-safe helper: only play if the context can actually resume.
+  const trySound = (fn: () => void) => {
+    try {
+      fn();
+    } catch {
+      /* audio blocked — visuals still complete */
+    }
+  };
+
+  // ---------- main orchestration ----------
   useEffect(() => {
-    if (sessionStorage.getItem(SESSION_KEY)) {
+    // In DEV, always show the boot screen. In prod, skip on repeat visits.
+    if (!import.meta.env.DEV && sessionStorage.getItem(SESSION_KEY)) {
       doneRef.current();
       return;
     }
@@ -66,20 +94,26 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
 
     const timers: number[] = [];
 
-    // 0.0s: fade in already happening via CSS; INSERT COIN visible.
-    // 0.3s: show booting text.
-    timers.push(window.setTimeout(() => setPhase('booting'), 300));
-    // 0.7s: begin progress lines.
-    timers.push(window.setTimeout(() => setPhase('progress'), 700));
+    // 0.40s — coin begins dropping
+    timers.push(
+      window.setTimeout(() => {
+        setCoinDropping(true);
+      }, T_COIN_DROP)
+    );
 
-    // Reveal progress lines one at a time with typewriter effect.
+    // 0.80s — INSERT COIN out, BOOTING text in
+    timers.push(window.setTimeout(() => setPhase('booting'), T_BOOTING));
+
+    // 1.00s — progress lines + bar begin
+    timers.push(window.setTimeout(() => setPhase('progress'), T_PROGRESS));
+
+    // progress lines typewriter, staggered
     PROGRESS_LINES.forEach((line, i) => {
-      const at = 700 + i * 230; // each line starts ~230ms apart
+      const at = T_PROGRESS + i * 150;
       timers.push(
         window.setTimeout(() => {
           typewrite(line, (out) => {
             setTypedLines((prev) => {
-              if (prev[i]) return prev;
               const next = [...prev];
               next[i] = out;
               return next;
@@ -89,49 +123,84 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
       );
     });
 
-    // 1.6s: progress bar reaches 100% (driven by rAF effect below, but we
-    // guarantee completion by setting phase to 'ready' at 1.8s).
-    // 1.8s: PING + gold flash + coin sparkle.
-    const finishAt = 1800;
+    // 1.90s — bar hits 100%, pause 200ms, then flash + ping
     timers.push(
       window.setTimeout(() => {
-        // Only finish if the site is ready; otherwise poll until it is.
-        const tryFinish = () => {
-          if (siteReadyRef.current) {
-            setPhase('ready');
-            sound.ping();
-            setCoinFlash(true);
-            setCoinSparkle(true);
-            window.setTimeout(() => setCoinFlash(false), 150);
-          } else {
-            requestAnimationFrame(tryFinish);
-          }
-        };
-        tryFinish();
-      }, finishAt)
+        setProgress(100);
+      }, T_PROGRESS_END)
+    );
+    timers.push(
+      window.setTimeout(() => {
+        setPhase('flash');
+        setShowFlash(true);
+        setSlotGlow(true);
+        trySound(() => sound.ping());
+        window.setTimeout(() => setShowFlash(false), 450);
+      }, T_FLASH)
     );
 
-    // 1.9s: begin fade out.
+    // 2.10s — READY!
+    timers.push(
+      window.setTimeout(() => {
+        setPhase('ready');
+        setShowSparkles(true);
+        window.setTimeout(() => setShowSparkles(false), 700);
+      }, T_READY)
+    );
+
+    // 2.35s — begin fade out (crossfade)
     timers.push(
       window.setTimeout(() => {
         setExit(true);
-        // 300ms cross-fade, then unmount + reveal hero.
-        window.setTimeout(() => doneRef.current(), 300);
-      }, 1900)
+      }, T_FADE_OUT)
+    );
+
+    // 2.70s — unmount, hero fully visible
+    timers.push(
+      window.setTimeout(() => {
+        doneRef.current();
+      }, T_DONE)
     );
 
     return () => timers.forEach((t) => window.clearTimeout(t));
   }, [reduced]);
 
-  // Smooth progress bar fill (eased) from 0 -> 100 over the first 1.6s.
+  // ---------- coin drop physics ----------
+  useEffect(() => {
+    if (!coinDropping || reduced) return;
+    let raf = 0;
+    const start = performance.now();
+    const dur = 360; // drop duration
+    const dropDist = 150; // px to fall
+    const loop = (now: number) => {
+      const t = Math.min(1, (now - start) / dur);
+      // easeInQuad gravity acceleration
+      const y = dropDist * (t * t);
+      setCoinY(y);
+      if (t < 1) {
+        raf = requestAnimationFrame(loop);
+      } else {
+        // coin enters slot
+        setShowSpark(true);
+        setShake(5);
+        trySound(() => sound.coinDrop());
+        window.setTimeout(() => setShowSpark(false), 400);
+        window.setTimeout(() => setShake(0), 200);
+      }
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [coinDropping, reduced]);
+
+  // ---------- loading bar smooth fill ----------
   useEffect(() => {
     if (reduced) return;
-    if (phase === 'ready' || phase === 'done') return;
-    startRef.current = performance.now();
-    const dur = 1600;
+    if (phase !== 'progress' && phase !== 'flash' && phase !== 'ready') return;
+    barStartRef.current = performance.now();
+    const dur = T_PROGRESS_END - T_PROGRESS; // 900ms
     const step = (now: number) => {
-      const t = Math.min(1, (now - startRef.current) / dur);
-      const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
+      const t = Math.min(1, (now - barStartRef.current) / dur);
+      const eased = 1 - Math.pow(1 - t, 2.4); // smooth ease-out
       setProgress(eased * 100);
       if (t < 1) rafRef.current = requestAnimationFrame(step);
     };
@@ -139,49 +208,109 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
     return () => cancelAnimationFrame(rafRef.current);
   }, [phase, reduced]);
 
-  if (exit && phase !== 'ready') return null;
+  if (exit && phase === 'done') return null;
 
-  const bootingText = phase === 'insert' ? 'INSERT COIN' : phase === 'booting' || phase === 'progress' ? 'BOOTING ARCADE SYSTEM...' : '';
+  const shakeX = shake > 0 ? (Math.random() - 0.5) * shake : 0;
+  const shakeY = shake > 0 ? (Math.random() - 0.5) * shake : 0;
+  const showInsert = phase === 'insert';
+  const showBooting = phase === 'booting' || phase === 'progress';
+  const showProgress = phase === 'progress' || phase === 'flash' || phase === 'ready';
+  const showBar = phase === 'progress' || phase === 'flash';
+  const showReady = phase === 'ready';
 
   return (
     <div
       className="boot-screen fixed inset-0 z-[10000] flex flex-col items-center justify-center bg-black"
       style={{
         opacity: exit ? 0 : 1,
-        transition: 'opacity 0.3s ease-out',
+        transform: `translate(${shakeX}px, ${shakeY}px)`,
+        transition: 'opacity 0.35s ease-out, transform 0.05s linear',
         animation: 'boot-fade-in 0.5s ease-out both',
       }}
       aria-hidden
     >
-      {/* CRT flicker + scanlines always on during boot */}
+      {/* CRT flicker + scanlines */}
       <div className="boot-flicker" data-on="true" />
       <div className="boot-scanlines" />
 
-      {/* INSERT COIN artwork with idle glow + flash + sparkle */}
-      <div className="relative mb-6">
-        <div
-          className={coinFlash ? 'boot-coin-flash' : 'boot-coin-glow'}
-          style={{ animationDuration: coinFlash ? '0.15s' : '2.4s' }}
-        >
-          <PixelSprite grid={COIN_FRONT} palette={PALETTE} pixel={3} scale={2.2} />
-        </div>
-        {coinSparkle && <div className="boot-coin-sparkle" />}
-      </div>
+      {/* golden completion flash */}
+      {showFlash && <div className="boot-gold-flash" />}
 
-      {/* INSERT COIN / BOOTING text */}
-      {bootingText && (
-        <div
-          key={bootingText}
-          className="boot-text font-pixel text-gold text-center"
-          style={{ fontSize: 'clamp(0.7rem, 2.6vw, 1.2rem)' }}
-        >
-          {bootingText}
+      {/* sparkle particles on READY */}
+      {showSparkles && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          {Array.from({ length: 8 }).map((_, i) => {
+            const ang = (i / 8) * Math.PI * 2;
+            const dist = 40 + (i % 3) * 12;
+            return (
+              <span
+                key={i}
+                className="boot-sparkle-particle"
+                style={{
+                  ['--sx' as string]: `${Math.cos(ang) * dist}px`,
+                  ['--sy' as string]: `${Math.sin(ang) * dist}px`,
+                  animationDelay: `${i * 0.03}s`,
+                }}
+              />
+            );
+          })}
         </div>
       )}
 
-      {/* Progress lines with typewriter effect */}
-      {phase === 'progress' && (
-        <div className="boot-lines font-pixel mt-6" style={{ fontSize: 'clamp(0.5rem, 1.6vw, 0.75rem)' }}>
+      {/* coin + slot scene (insert phase) */}
+      {(showInsert || coinDropping) && (
+        <div className="relative flex flex-col items-center" style={{ marginBottom: 60 }}>
+          {/* floating / dropping coin */}
+          <div
+            className={coinDropping ? '' : 'boot-coin-idle'}
+            style={{
+              transform: `translateY(${coinY}px)`,
+              opacity: coinDropping && coinY > 140 ? 0 : 1,
+              transition: 'opacity 0.08s linear',
+            }}
+          >
+            <PixelSprite grid={COIN_FRONT} palette={PALETTE} pixel={3} scale={2.2} />
+          </div>
+
+          {/* spark on coin entering slot */}
+          {showSpark && (
+            <>
+              {Array.from({ length: 4 }).map((_, i) => (
+                <span
+                  key={i}
+                  className="boot-spark"
+                  style={{
+                    left: `${44 + (i - 1.5) * 10}px`,
+                    animationDelay: `${i * 0.02}s`,
+                  }}
+                />
+              ))}
+            </>
+          )}
+
+          {/* the coin slot — sits below the coin's drop path */}
+          <div className={`boot-slot mt-8 ${slotGlow ? 'boot-slot-glow' : ''}`} />
+        </div>
+      )}
+
+      {/* INSERT COIN — blinks every 500ms */}
+      {showInsert && (
+        <div
+          className="boot-text boot-blink font-pixel text-gold text-center"
+          style={{ fontSize: 'clamp(0.7rem, 2.6vw, 1.2rem)', marginTop: 8 }}
+        >
+          INSERT COIN
+        </div>
+      )}
+
+      {/* BOOTING ARCADE SYSTEM... typewriter */}
+      {showBooting && (
+        <BootText text="BOOTING ARCADE SYSTEM..." />
+      )}
+
+      {/* progress lines */}
+      {showProgress && (
+        <div className="boot-lines font-pixel mt-5" style={{ fontSize: 'clamp(0.5rem, 1.6vw, 0.7rem)' }}>
           {PROGRESS_LINES.map((_, i) => (
             <div key={i} className="boot-line" style={{ minHeight: '1.6em' }}>
               <span style={{ visibility: typedLines[i] ? 'visible' : 'hidden' }}>
@@ -192,18 +321,28 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
         </div>
       )}
 
-      {/* Progress bar */}
-      {phase !== 'ready' && (
-        <div className="boot-bar-wrap pixel-border mt-6">
+      {/* loading bar */}
+      {showBar && (
+        <div className="boot-bar-wrap pixel-border mt-5">
           <div
             className="boot-bar-fill h-full bg-gold"
-            style={{ width: `${progress}%`, transition: 'width 0.08s linear' }}
+            style={{ width: `${progress}%`, transition: 'width 0.05s linear' }}
           />
         </div>
       )}
 
-      {/* power-on reveal sweep on ready */}
-      {phase === 'ready' && <div className="boot-reveal-sweep" />}
+      {/* READY! */}
+      {showReady && (
+        <div
+          className="boot-ready font-pixel text-gold text-center"
+          style={{
+            fontSize: 'clamp(1.2rem, 5vw, 2.4rem)',
+            textShadow: '0 0 12px rgba(255,210,63,0.7), 3px 3px 0 #1a1530',
+          }}
+        >
+          READY!
+        </div>
+      )}
     </div>
   );
 }
@@ -214,7 +353,34 @@ function typewrite(text: string, cb: (out: string) => void) {
   const step = () => {
     i++;
     cb(text.slice(0, i));
-    if (i < text.length) window.setTimeout(step, 28);
+    if (i < text.length) window.setTimeout(step, 32);
   };
   step();
+}
+
+/** Typewriter text component for the BOOTING line. */
+function BootText({ text }: { text: string }) {
+  const [out, setOut] = useState('');
+  useEffect(() => {
+    let i = 0;
+    let cancelled = false;
+    const step = () => {
+      if (cancelled) return;
+      i++;
+      setOut(text.slice(0, i));
+      if (i < text.length) window.setTimeout(step, 45);
+    };
+    step();
+    return () => { cancelled = true; };
+  }, [text]);
+  return (
+    <div
+      key={text}
+      className="boot-text font-pixel text-gold text-center"
+      style={{ fontSize: 'clamp(0.6rem, 2.2vw, 1rem)' }}
+    >
+      {out}
+      <span className="animate-blink" style={{ animationDuration: '0.6s' }}>_</span>
+    </div>
+  );
 }
