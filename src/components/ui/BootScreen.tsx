@@ -63,6 +63,11 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
   const doneRef = useRef(onDone);
   doneRef.current = onDone;
 
+  const finish = () => {
+    window.dispatchEvent(new Event('bootscreen:finished'));
+    doneRef.current();
+  };
+
   // audio-safe helper: only play if the context can actually resume.
   const trySound = (fn: () => void) => {
     try {
@@ -76,7 +81,7 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
   useEffect(() => {
     // In DEV, always show the boot screen. In prod, skip on repeat visits.
     if (!import.meta.env.DEV && sessionStorage.getItem(SESSION_KEY)) {
-      doneRef.current();
+      finish();
       return;
     }
     sessionStorage.setItem(SESSION_KEY, '1');
@@ -85,7 +90,7 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
       const t1 = window.setTimeout(() => setPhase('ready'), 200);
       const t2 = window.setTimeout(() => {
         setExit(true);
-        window.setTimeout(() => doneRef.current(), 260);
+        window.setTimeout(() => finish(), 260);
       }, 500);
       return () => {
         window.clearTimeout(t1);
@@ -159,7 +164,7 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
     // 2.70s — unmount, hero fully visible
     timers.push(
       window.setTimeout(() => {
-        doneRef.current();
+        finish();
       }, T_DONE)
     );
 

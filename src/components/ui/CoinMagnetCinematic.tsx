@@ -150,6 +150,20 @@ export function CoinMagnetCinematic() {
 
     const timers: number[] = [];
     let cancelled = false;
+    let booted = false;
+    let bootRaf = 0;
+
+    const onBooted = () => {
+      if (booted || cancelled) return;
+      booted = true;
+      window.removeEventListener('bootscreen:finished', onBooted);
+      // give the hero ~800ms to breathe before the cinematic begins
+      bootRaf = window.setTimeout(() => {
+        if (cancelled) return;
+        if (measure()) startCinematic();
+        else requestAnimationFrame(waitForMascot);
+      }, 800);
+    };
 
     const waitForMascot = () => {
       if (cancelled) return;
@@ -158,49 +172,54 @@ export function CoinMagnetCinematic() {
     };
 
     const startCinematic = () => {
+      if (cancelled) return;
+      setPhase('first');
+      phaseRef.current = 'first';
+      const c = mascotCenter.current;
+      spawnCoin(c.x + (Math.random() - 0.5) * 60, 1);
+      lookUpRef.current = true;
+      sound.tap();
+
       timers.push(
         window.setTimeout(() => {
           if (cancelled) return;
-          setPhase('first');
-          phaseRef.current = 'first';
-          const c = mascotCenter.current;
-          spawnCoin(c.x + (Math.random() - 0.5) * 60, 1);
-          lookUpRef.current = true;
-          sound.tap();
+          setPhase('rain');
+          phaseRef.current = 'rain';
+          for (let i = 0; i < 5; i++) {
+            const delay = i * 180 + Math.random() * 220;
+            timers.push(
+              window.setTimeout(() => {
+                if (cancelled) return;
+                spawnCoin(c.x + (Math.random() - 0.5) * 260, 0.9 + Math.random() * 0.3);
+              }, delay)
+            );
+          }
+        }, 900)
+      );
 
-          timers.push(
-            window.setTimeout(() => {
-              if (cancelled) return;
-              setPhase('rain');
-              phaseRef.current = 'rain';
-              for (let i = 0; i < 5; i++) {
-                const delay = i * 180 + Math.random() * 220;
-                timers.push(
-                  window.setTimeout(() => {
-                    if (cancelled) return;
-                    spawnCoin(c.x + (Math.random() - 0.5) * 260, 0.9 + Math.random() * 0.3);
-                  }, delay)
-                );
-              }
-            }, 900)
-          );
-
-          timers.push(
-            window.setTimeout(() => {
-              if (cancelled) return;
-              setPhase('magnet');
-              phaseRef.current = 'magnet';
-              sound.confirm();
-              coins.current.forEach((co) => {
-                if (co.state === 'falling') co.state = 'magnetized';
-              });
-            }, 2900)
-          );
-        }, 1800)
+      timers.push(
+        window.setTimeout(() => {
+          if (cancelled) return;
+          setPhase('magnet');
+          phaseRef.current = 'magnet';
+          sound.confirm();
+          coins.current.forEach((co) => {
+            if (co.state === 'falling') co.state = 'magnetized';
+          });
+        }, 2900)
       );
     };
 
     requestAnimationFrame(waitForMascot);
+
+    // Synchronize with the BootScreen: only begin after it has fully
+    // faded out, regardless of how long it actually took.
+    window.addEventListener('bootscreen:finished', onBooted);
+    // Fallback: if there's no boot screen at all (e.g. already-played
+    // session), kick off after a short delay.
+    const fallback = window.setTimeout(() => {
+      if (!booted && !cancelled) onBooted();
+    }, 1200);
 
     const container = containerRef.current;
     let ioCleanup: (() => void) | undefined;
@@ -342,6 +361,9 @@ export function CoinMagnetCinematic() {
       cancelled = true;
       cancelAnimationFrame(raf);
       timers.forEach((t) => window.clearTimeout(t));
+      window.clearTimeout(bootRaf);
+      window.clearTimeout(fallback);
+      window.removeEventListener('bootscreen:finished', onBooted);
       if (ioCleanup) ioCleanup();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
