@@ -24,7 +24,6 @@ import { usePrefersReducedMotion } from '@/hooks';
  * completes and pauses when off-screen. Respects prefers-reduced-motion.
  */
 
-const SESSION_KEY = 'coinbuddy-magnet-played';
 const COIN_POOL = 12;
 const SPARK_POOL = 80;
 
@@ -144,11 +143,8 @@ export function CoinMagnetCinematic() {
   // main orchestration + rAF loop
   useEffect(() => {
     if (reduced) return;
-    if (import.meta.env.DEV) sessionStorage.removeItem(SESSION_KEY);
-    if (sessionStorage.getItem(SESSION_KEY)) return;
-    sessionStorage.setItem(SESSION_KEY, '1');
 
-    // [Cinematic] Cinematic Mounted
+    // Always play the cinematic on every page load/refresh.
 
     const timers: number[] = [];
     let cancelled = false;

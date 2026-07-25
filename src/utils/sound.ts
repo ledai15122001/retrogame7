@@ -19,9 +19,23 @@ function ensure(): AudioContext | null {
       return null;
     }
   }
-  if (ctx && ctx.state === 'suspended') void ctx.resume();
+  if (ctx && ctx.state === 'suspended') {
+    // Fire-and-forget resume, but also fast-forward scheduled nodes once it
+    // actually resumes so sounds scheduled against a frozen currentTime play.
+    ctx.resume().then(() => {
+      if (ctx && ctx.state === 'running' && pending.length) {
+        const offset = ctx.currentTime;
+        for (const p of pending) p(offset);
+        pending.length = 0;
+      }
+    }).catch(() => {});
+  }
   return ctx;
 }
+
+// Queue of blips scheduled while the context was suspended; they get
+// re-scheduled at the real currentTime once the context resumes.
+const pending: ((offset: number) => void)[] = [];
 
 type Wave = 'square' | 'triangle' | 'sine' | 'sawtooth';
 
@@ -35,19 +49,29 @@ function blip(
 ) {
   const ac = ensure();
   if (!ac || !master || !enabled) return;
-  const osc = ac.createOscillator();
-  const gain = ac.createGain();
-  osc.type = type;
-  const t0 = ac.currentTime + delay;
-  osc.frequency.setValueAtTime(freq, t0);
-  if (slideTo) osc.frequency.exponentialRampToValueAtTime(Math.max(1, slideTo), t0 + duration);
-  gain.gain.setValueAtTime(0.0001, t0);
-  gain.gain.exponentialRampToValueAtTime(vol, t0 + 0.008);
-  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
-  osc.connect(gain);
-  gain.connect(master);
-  osc.start(t0);
-  osc.stop(t0 + duration + 0.02);
+  const out = master;
+
+  const schedule = (offset: number) => {
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.type = type;
+    const t0 = offset + delay;
+    osc.frequency.setValueAtTime(freq, t0);
+    if (slideTo) osc.frequency.exponentialRampToValueAtTime(Math.max(1, slideTo), t0 + duration);
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.exponentialRampToValueAtTime(vol, t0 + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+    osc.connect(gain);
+    gain.connect(out);
+    osc.start(t0);
+    osc.stop(t0 + duration + 0.02);
+  };
+
+  if (ac.state === 'suspended') {
+    pending.push(schedule);
+  } else {
+    schedule(ac.currentTime);
+  }
 }
 
 export const sound = {

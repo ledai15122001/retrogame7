@@ -17,11 +17,10 @@ import { COIN_FRONT, PALETTE } from '@/components/sprites/sprites';
  *   3.60s  crossfade out, hero revealed underneath
  *   4.00s  unmount
  *
- * In DEV mode the boot screen always plays (no sessionStorage skip).
+ * Always plays on every page load/refresh.
  * Respects prefers-reduced-motion (shortened to a quick fade).
  * Audio is guarded: sounds only fire if the AudioContext can resume.
  */
-const SESSION_KEY = 'coinbuddy-booted';
 
 type Phase = 'insert' | 'booting' | 'progress' | 'flash' | 'ready' | 'done';
 
@@ -83,12 +82,9 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
 
   // ---------- main orchestration ----------
   useEffect(() => {
-    // In DEV, always show the boot screen. In prod, skip on repeat visits.
-    if (!import.meta.env.DEV && sessionStorage.getItem(SESSION_KEY)) {
-      finish();
-      return;
-    }
-    sessionStorage.setItem(SESSION_KEY, '1');
+    // Always play the boot screen on every page load/refresh.
+    // Proactively resume the AudioContext so scheduled sounds are audible.
+    sound.resume();
 
     if (reduced) {
       const t1 = window.setTimeout(() => setPhase('ready'), 200);
