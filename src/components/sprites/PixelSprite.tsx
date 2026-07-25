@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 
 /**
  * Grid-based pixel art renderer.
@@ -7,6 +7,8 @@ import { memo } from 'react';
  * ' ' or '.' = transparent.
  *
  * Renders crisp SVG <rect>s with shape-rendering: crispEdges.
+ * The rect list is memoized on (grid, palette, pixel, scale) so identical
+ * sprites skip re-computation across re-renders.
  */
 export interface PixelSpriteProps {
   grid: string[];
@@ -19,6 +21,8 @@ export interface PixelSpriteProps {
   title?: string;
 }
 
+const BASE_STYLE: React.CSSProperties = { imageRendering: 'pixelated', display: 'block' };
+
 export const PixelSprite = memo(function PixelSprite({
   grid,
   palette,
@@ -28,36 +32,47 @@ export const PixelSprite = memo(function PixelSprite({
   style,
   title,
 }: PixelSpriteProps) {
+  const px = pixel * scale;
   const w = grid[0]?.length ?? 0;
   const h = grid.length;
-  const px = pixel * scale;
-  const rects: React.ReactElement[] = [];
-  for (let y = 0; y < h; y++) {
-    const row = grid[y];
-    for (let x = 0; x < w; x++) {
-      const ch = row[x];
-      if (!ch || ch === ' ' || ch === '.') continue;
-      const color = palette[ch];
-      if (!color) continue;
-      rects.push(
-        <rect
-          key={`${x}-${y}`}
-          x={x * px}
-          y={y * px}
-          width={px}
-          height={px}
-          fill={color}
-        />
-      );
+
+  const rects = useMemo(() => {
+    const out: React.ReactElement[] = [];
+    for (let y = 0; y < h; y++) {
+      const row = grid[y];
+      for (let x = 0; x < w; x++) {
+        const ch = row[x];
+        if (!ch || ch === ' ' || ch === '.') continue;
+        const color = palette[ch];
+        if (!color) continue;
+        out.push(
+          <rect
+            key={`${x}-${y}`}
+            x={x * px}
+            y={y * px}
+            width={px}
+            height={px}
+            fill={color}
+          />
+        );
+      }
     }
-  }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [grid, palette, pixel, scale]);
+
+  const svgStyle = useMemo(
+    () => (style ? { ...BASE_STYLE, ...style } : BASE_STYLE),
+    [style]
+  );
+
   return (
     <svg
       width={w * px}
       height={h * px}
       viewBox={`0 0 ${w * px} ${h * px}`}
       className={className}
-      style={{ imageRendering: 'pixelated', display: 'block', ...style }}
+      style={svgStyle}
       shapeRendering="crispEdges"
       role={title ? 'img' : 'presentation'}
       aria-label={title}

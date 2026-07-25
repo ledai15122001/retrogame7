@@ -2,6 +2,7 @@ import { Reveal } from '@/components/ui/Reveal';
 import { PixelSprite } from '@/components/sprites/PixelSprite';
 import { COIN_FRONT, PALETTE, SHROOM } from '@/components/sprites/sprites';
 import { HillDivider } from '@/components/ui/HillDivider';
+import { useMemo } from 'react';
 
 const CARDS = [
   { label: 'Total Supply', value: '1,000,000,000', note: 'one billion buddies', accent: 'text-gold' },
@@ -11,6 +12,8 @@ const CARDS = [
   { label: 'Burn', value: '30%', note: 'sent to the void', accent: 'text-purple-light' },
   { label: 'Market Cap', value: '???', note: 'you decide, ser', accent: 'text-gold' },
 ];
+
+const SHROOM_PAL = { ...PALETTE };
 
 export function Tokenomics() {
   return (
@@ -50,7 +53,7 @@ export function Tokenomics() {
               <div className="pixel-card glow-ring group flex h-full flex-col items-center gap-2 p-5 text-center">
                 <PixelSprite
                   grid={i % 3 === 0 ? COIN_FRONT : SHROOM}
-                  palette={i % 3 === 0 ? PALETTE : { ...PALETTE }}
+                  palette={i % 3 === 0 ? PALETTE : SHROOM_PAL}
                   pixel={3}
                   className="transition-transform group-hover:animate-bob"
                 />

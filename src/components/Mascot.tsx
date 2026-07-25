@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, memo } from 'react';
 import { PixelSprite } from '@/components/sprites/PixelSprite';
 import {
   MASCOT_BODY,
@@ -8,7 +8,7 @@ import {
   PALETTE,
 } from '@/components/sprites/sprites';
 import { sound } from '@/utils/sound';
-import { useMousePos, useRandomInterval } from '@/hooks';
+import { useMouseLerp, useRandomInterval } from '@/hooks';
 
 const MESSAGES = [
   'gm',
@@ -30,9 +30,12 @@ type Pose = 'idle' | 'jump' | 'wave';
  * Idle bounces, blinks, eyes follow the cursor, jumps when clicked,
  * waves on a random idle timer, shows a speech bubble on hover,
  * puffs dust when it lands.
+ *
+ * Performance: eye-tracking uses useMouseLerp (ref-based, no re-renders)
+ * and writes pupil transforms imperatively in a single rAF loop.
  */
 export function Mascot({ size = 3 }: { size?: number }) {
-  const mouse = useMousePos();
+  const mouse = useMouseLerp();
   const [pose, setPose] = useState<Pose>('idle');
   const [jumping, setJumping] = useState(false);
   const [showBubble, setShowBubble] = useState(false);
@@ -43,6 +46,8 @@ export function Mascot({ size = 3 }: { size?: number }) {
   const [blink, setBlink] = useState(false);
 
   const ref = useRef<HTMLDivElement | null>(null);
+  const pupilLRef = useRef<HTMLDivElement | null>(null);
+  const pupilRRef = useRef<HTMLDivElement | null>(null);
   const dustId = useRef(0);
   const blinkTimer = useRef<number | undefined>(undefined);
 
@@ -120,9 +125,24 @@ export function Mascot({ size = 3 }: { size?: number }) {
     return () => window.removeEventListener('mascot:buyHover', onBuyHover as EventListener);
   }, []);
 
-  // eyes follow mouse — small offset applied via overlay pupils
-  const eyeOffsetX = mouse.x * 1.2;
-  const eyeOffsetY = mouse.y * 0.8;
+  // eye-tracking: write pupil offsets imperatively from the ref-based
+  // mouse lerp — no React re-renders per mouse move.
+  useEffect(() => {
+    let raf = 0;
+    const loop = () => {
+      const mx = mouse.current.x * 1.2;
+      const my = mouse.current.y * 0.8;
+      const lx = (6 + mx) * 3 * size;
+      const ly = (5 + my) * 3 * size;
+      const rx = (10 + mx) * 3 * size;
+      const ry = (5 + my) * 3 * size;
+      if (pupilLRef.current) pupilLRef.current.style.transform = `translate(${lx}px, ${ly}px)`;
+      if (pupilRRef.current) pupilRRef.current.style.transform = `translate(${rx}px, ${ry}px)`;
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [mouse, size]);
 
   const currentGrid = pose === 'jump' ? MASCOT_JUMP : pose === 'wave' ? MASCOT_WINK : MASCOT_BODY;
 
@@ -176,31 +196,16 @@ export function Mascot({ size = 3 }: { size?: number }) {
       <div className="relative cursor-pointer" style={{ transform: pose === 'wave' ? 'rotate(-3deg)' : 'none', transition: 'transform 0.2s ease' }}>
         <PixelSprite grid={currentGrid} palette={PALETTE} pixel={3} scale={size} />
 
-        {/* pupils overlay (eye-tracking) — only when not blinking/jumping */}
+        {/* pupils overlay (eye-tracking) — only when not blinking/jumping.
+            Positioned imperatively via refs to avoid per-frame re-renders. */}
         {pose !== 'jump' && !blink && (
           <>
-            <PixelSprite
-              grid={['p']}
-              palette={PALETTE}
-              pixel={3}
-              scale={size}
-              style={{
-                position: 'absolute',
-                left: (6 + eyeOffsetX) * 3 * size,
-                top: (5 + eyeOffsetY) * 3 * size,
-              }}
-            />
-            <PixelSprite
-              grid={['p']}
-              palette={PALETTE}
-              pixel={3}
-              scale={size}
-              style={{
-                position: 'absolute',
-                left: (10 + eyeOffsetX) * 3 * size,
-                top: (5 + eyeOffsetY) * 3 * size,
-              }}
-            />
+            <div ref={pupilLRef} className="pointer-events-none absolute left-0 top-0">
+              <PixelSprite grid={['p']} palette={PALETTE} pixel={3} scale={size} />
+            </div>
+            <div ref={pupilRRef} className="pointer-events-none absolute left-0 top-0">
+              <PixelSprite grid={['p']} palette={PALETTE} pixel={3} scale={size} />
+            </div>
           </>
         )}
 

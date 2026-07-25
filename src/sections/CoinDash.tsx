@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useMemo } from 'react';
 import { CoinDashGame, type GameHandle, type GameStatus } from '@/components/game/CoinDashGame';
 import { PixelButton } from '@/components/ui/PixelButton';
 import { Reveal } from '@/components/ui/Reveal';
@@ -22,13 +22,16 @@ export function CoinDash() {
   const [combo, setCombo] = useState(0);
   const { ref: cabRef, inView: cabOn } = useInViewOnce<HTMLDivElement>({ threshold: 0.3 });
 
-  const callbacks = {
-    onStatus: setStatus,
-    onScore: setScore,
-    onBest: setBest,
-    onMisses: setMisses,
-    onCombo: setCombo,
-  };
+  const callbacks = useMemo(
+    () => ({
+      onStatus: setStatus,
+      onScore: setScore,
+      onBest: setBest,
+      onMisses: setMisses,
+      onCombo: setCombo,
+    }),
+    []
+  );
 
   const handleStart = useCallback(() => {
     sound.tap();

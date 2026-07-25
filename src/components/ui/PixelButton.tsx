@@ -1,4 +1,4 @@
-import { forwardRef, ButtonHTMLAttributes } from 'react';
+import { forwardRef, ButtonHTMLAttributes, useCallback, useMemo } from 'react';
 import { sound } from '@/utils/sound';
 
 type Variant = 'gold' | 'pink' | 'cyan' | 'purple' | 'ghost';
@@ -18,17 +18,29 @@ const variantClass: Record<Variant, string> = {
 
 export const PixelButton = forwardRef<HTMLButtonElement, PixelButtonProps>(
   function PixelButton({ variant = 'gold', silent, className, children, onClick, ...rest }, ref) {
+    const handleClick = useCallback(
+      (e: React.MouseEvent<HTMLButtonElement>) => {
+        if (!silent) sound.tap();
+        onClick?.(e);
+      },
+      [silent, onClick]
+    );
+
+    const handleMouseEnter = useCallback(() => {
+      if (!silent) sound.tap();
+    }, [silent]);
+
+    const cls = useMemo(
+      () => `pixel-btn ${variantClass[variant]} ${className ?? ''}`,
+      [variant, className]
+    );
+
     return (
       <button
         ref={ref}
-        className={`pixel-btn ${variantClass[variant]} ${className ?? ''}`}
-        onClick={(e) => {
-          if (!silent) sound.tap();
-          onClick?.(e);
-        }}
-        onMouseEnter={() => {
-          if (!silent) sound.tap();
-        }}
+        className={cls}
+        onClick={handleClick}
+        onMouseEnter={handleMouseEnter}
         {...rest}
       >
         {children}

@@ -3,6 +3,10 @@ import { PixelSprite } from '@/components/sprites/PixelSprite';
 import { COIN_FRONT, TREE, SHROOM, HEART, PALETTE } from '@/components/sprites/sprites';
 import { HillDivider } from '@/components/ui/HillDivider';
 
+const CLOUD_GRID = ['   ccc     ', '  ccCCCcc  ', ' ccCCCCCccc', 'ccCCCCCCCCCc', ' cCCCCCCCCc ', '  cCCCCCCc  '];
+const CLOUD_PAL = { c: '#f5ead3', C: '#d8c9a6' };
+const HEART_PAL = { x: '#ff5d8f' };
+
 const LEVELS = [
   {
     level: 'LEVEL 1',
@@ -27,7 +31,7 @@ const LEVELS = [
     title: 'Moon',
     items: ['Moon', 'World domination', 'Snacks'],
     icon: HEART,
-    iconPal: { x: '#ff5d8f' },
+    iconPal: HEART_PAL,
     accent: 'text-pink',
     done: false,
   },
@@ -39,15 +43,15 @@ export function Roadmap() {
       {/* drifting clouds */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-40" aria-hidden>
         <PixelSprite
-          grid={['   ccc     ', '  ccCCCcc  ', ' ccCCCCCccc', 'ccCCCCCCCCCc', ' cCCCCCCCCc ', '  cCCCCCCc  ']}
-          palette={{ c: '#f5ead3', C: '#d8c9a6' }}
+          grid={CLOUD_GRID}
+          palette={CLOUD_PAL}
           pixel={3}
           className="absolute animate-drift"
           style={{ top: '12%' }}
         />
         <PixelSprite
-          grid={['   ccc     ', '  ccCCCcc  ', ' ccCCCCCccc', 'ccCCCCCCCCCc', ' cCCCCCCCCc ', '  cCCCCCCc  ']}
-          palette={{ c: '#f5ead3', C: '#d8c9a6' }}
+          grid={CLOUD_GRID}
+          palette={CLOUD_PAL}
           pixel={3}
           className="absolute animate-drift"
           style={{ top: '22%', animationDelay: '14s', animationDuration: '52s' }}

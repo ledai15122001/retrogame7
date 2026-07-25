@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useMemo } from 'react';
 import { PixelSprite } from '@/components/sprites/PixelSprite';
 import { COIN_FRONT, COIN_SIDE, PALETTE } from '@/components/sprites/sprites';
 import { sound } from '@/utils/sound';
@@ -12,9 +12,14 @@ interface CollectPop {
 
 let popId = 0;
 
+const COIN_STYLE: React.CSSProperties = { transition: 'transform 0.1s ease' };
+
 /**
  * A spinning pixel coin. Spins continuously; spins faster on hover.
  * Click to "collect" — plays a sound and pops a "+1" that floats up.
+ *
+ * Performance: the spin animation is driven imperatively by toggling the
+ * front/side sprite layers' opacity via refs — no per-frame React re-renders.
  */
 export function SpinningCoin({
   size = 1,
@@ -28,15 +33,27 @@ export function SpinningCoin({
   const [hovering, setHovering] = useState(false);
   const [pops, setPops] = useState<CollectPop[]>([]);
   const phase = useRef(0);
-  const [showFront, setShowFront] = useState(true);
+  const frontRef = useRef<HTMLDivElement | null>(null);
+  const sideRef = useRef<HTMLDivElement | null>(null);
+  const hoveringRef = useRef(false);
 
   useRaf((dt) => {
-    const speed = hovering && fastHover ? 0.012 : 0.0035;
+    const speed = hoveringRef.current && fastHover ? 0.012 : 0.0035;
     phase.current += dt * speed;
-    // 8-frame spin cycle; show side near the "edge" frames
-    const frame = Math.floor((phase.current % 8));
-    setShowFront(frame !== 2 && frame !== 6);
+    const frame = Math.floor(phase.current % 8);
+    const showFront = frame !== 2 && frame !== 6;
+    if (frontRef.current) frontRef.current.style.opacity = showFront ? '1' : '0';
+    if (sideRef.current) sideRef.current.style.opacity = showFront ? '0' : '1';
   });
+
+  const onMouseEnter = useCallback(() => {
+    setHovering(true);
+    hoveringRef.current = true;
+  }, []);
+  const onMouseLeave = useCallback(() => {
+    setHovering(false);
+    hoveringRef.current = false;
+  }, []);
 
   const collect = useCallback((e: React.MouseEvent) => {
     sound.coin();
@@ -49,23 +66,27 @@ export function SpinningCoin({
     setTimeout(() => setPops((p) => p.filter((pop) => pop.id !== id)), 900);
   }, []);
 
+  const btnStyle = useMemo(
+    () => ({ background: 'none', border: 'none', padding: 0 }),
+    []
+  );
+
   return (
     <button
       type="button"
       className={`relative cursor-pointer outline-none ${className}`}
-      style={{ background: 'none', border: 'none', padding: 0 }}
-      onMouseEnter={() => setHovering(true)}
-      onMouseLeave={() => setHovering(false)}
+      style={btnStyle}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
       onClick={collect}
       aria-label="Collect a coin"
     >
-      <PixelSprite
-        grid={showFront ? COIN_FRONT : COIN_SIDE}
-        palette={PALETTE}
-        pixel={4}
-        scale={size}
-        style={{ transition: 'transform 0.1s ease' }}
-      />
+      <div ref={frontRef} style={{ position: 'absolute', inset: 0 }}>
+        <PixelSprite grid={COIN_FRONT} palette={PALETTE} pixel={4} scale={size} style={COIN_STYLE} />
+      </div>
+      <div ref={sideRef} style={{ position: 'absolute', inset: 0, opacity: 0 }}>
+        <PixelSprite grid={COIN_SIDE} palette={PALETTE} pixel={4} scale={size} style={COIN_STYLE} />
+      </div>
       {pops.map((pop) => (
         <span
           key={pop.id}
