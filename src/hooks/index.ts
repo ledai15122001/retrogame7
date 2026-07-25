@@ -127,6 +127,43 @@ export function useRandomInterval(callback: () => void, min: number, max: number
   }, [min, max, active]);
 }
 
+/**
+ * Smoothed mouse position via lerp, updated in a single rAF loop.
+ * Returns a ref (no re-renders) to {x,y} normalized -1..1 from center.
+ * Falls back to device orientation on mobile when available; otherwise
+ * the values stay at 0 (everything centered, never dizzy).
+ */
+export function useMouseLerp() {
+  const target = useRef({ x: 0, y: 0 });
+  const current = useRef({ x: 0, y: 0 });
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      target.current.x = (e.clientX / window.innerWidth) * 2 - 1;
+      target.current.y = (e.clientY / window.innerHeight) * 2 - 1;
+    };
+    const onOrient = (e: DeviceOrientationEvent) => {
+      if (e.gamma == null || e.beta == null) return;
+      target.current.x = Math.max(-1, Math.min(1, e.gamma / 30));
+      target.current.y = Math.max(-1, Math.min(1, (e.beta - 30) / 30));
+    };
+    window.addEventListener('mousemove', onMove, { passive: true });
+    window.addEventListener('deviceorientation', onOrient, { passive: true });
+    let raf = 0;
+    const loop = () => {
+      current.current.x += (target.current.x - current.current.x) * 0.08;
+      current.current.y += (target.current.y - current.current.y) * 0.08;
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('deviceorientation', onOrient);
+      cancelAnimationFrame(raf);
+    };
+  }, []);
+  return current;
+}
+
 /** prefers-reduced-motion flag */
 export function usePrefersReducedMotion() {
   const [reduced, setReduced] = useState(false);

@@ -7,14 +7,14 @@ import { COIN_FRONT, PALETTE } from '@/components/sprites/sprites';
 /**
  * Premium retro arcade power-on boot screen.
  *
- * Timeline (~2.4s total):
+ * Timeline (~4.0s total):
  *   0.00s  fade in from black, scanlines + flicker, coin floats, "INSERT COIN" blinks
- *   0.40s  coin drops with gravity into the coin slot -> spark + shake + metallic sound
- *   0.80s  "INSERT COIN" out, "BOOTING ARCADE SYSTEM..." typewriter in
- *   1.00s  progress lines type out one by one; loading bar fills smoothly 0->100%
- *   1.90s  100% reached -> 200ms pause -> golden flash + slot glow + PING
- *   2.10s  "READY!" pops in with sparkle particles, holds ~250ms
- *   2.35s  crossfade out, hero revealed underneath
+ *   0.80s  coin drops with gravity into the coin slot -> spark + shake + metallic sound
+ *   1.20s  "INSERT COIN" out, "BOOTING ARCADE SYSTEM..." typewriter in
+ *   1.50s  progress lines type out one by one; loading bar fills smoothly 0->100%
+ *   3.50s  100% reached -> 300ms pause -> golden flash + slot glow + PING
+ *   3.80s  "READY!" pops in with sparkle particles, holds ~400ms
+ *   4.00s  crossfade out, hero revealed underneath
  *
  * In DEV mode the boot screen always plays (no sessionStorage skip).
  * Respects prefers-reduced-motion (shortened to a quick fade).
@@ -34,14 +34,14 @@ const PROGRESS_LINES = [
 ];
 
 // timeline constants (ms)
-const T_COIN_DROP = 400;
-const T_BOOTING = 800;
-const T_PROGRESS = 1000;
-const T_PROGRESS_END = 1900; // bar reaches 100%
-const T_FLASH = 2100; // 200ms pause after 100%
-const T_READY = 2250; // READY! visible
-const T_FADE_OUT = 2350;
-const T_DONE = 2700; // unmount
+const T_COIN_DROP = 800;
+const T_BOOTING = 1200;
+const T_PROGRESS = 1500;
+const T_PROGRESS_END = 3500; // bar reaches 100% (fills over ~2s)
+const T_FLASH = 3800; // 300ms pause after 100%
+const T_READY = 3850; // READY! visible
+const T_FADE_OUT = 4250; // READY holds ~400ms then crossfade
+const T_DONE = 4600; // unmount
 
 export function BootScreen({ onDone }: { onDone: () => void }) {
   const reduced = usePrefersReducedMotion();
@@ -53,9 +53,10 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
   const [coinY, setCoinY] = useState(0);
   const [slotGlow, setSlotGlow] = useState(false);
   const [showSpark, setShowSpark] = useState(false);
-  const [shake, setShake] = useState(0);
   const [showFlash, setShowFlash] = useState(false);
   const [showSparkles, setShowSparkles] = useState(false);
+  const shakeRef = useRef(0);
+  const shakeOffsetRef = useRef({ x: 0, y: 0 });
 
   const rafRef = useRef<number>(0);
   const barStartRef = useRef<number>(0);
@@ -165,27 +166,40 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
     return () => timers.forEach((t) => window.clearTimeout(t));
   }, [reduced]);
 
-  // ---------- coin drop physics ----------
+  // ---------- coin drop physics + shake (rAF, no re-render) ----------
   useEffect(() => {
     if (!coinDropping || reduced) return;
     let raf = 0;
     const start = performance.now();
-    const dur = 360; // drop duration
+    const dur = 420; // drop duration
     const dropDist = 150; // px to fall
     const loop = (now: number) => {
       const t = Math.min(1, (now - start) / dur);
-      // easeInQuad gravity acceleration
       const y = dropDist * (t * t);
       setCoinY(y);
+      if (shakeRef.current > 0) {
+        const s = shakeRef.current;
+        shakeOffsetRef.current.x = (Math.random() - 0.5) * s;
+        shakeOffsetRef.current.y = (Math.random() - 0.5) * s;
+      }
       if (t < 1) {
         raf = requestAnimationFrame(loop);
       } else {
-        // coin enters slot
         setShowSpark(true);
-        setShake(5);
+        shakeRef.current = 5;
         trySound(() => sound.coinDrop());
         window.setTimeout(() => setShowSpark(false), 400);
-        window.setTimeout(() => setShake(0), 200);
+        window.setTimeout(() => { shakeRef.current = 0; }, 220);
+        // keep the rAF alive briefly to apply shake offsets
+        raf = requestAnimationFrame(loop2);
+      }
+    };
+    const loop2 = () => {
+      if (shakeRef.current > 0) {
+        const s = shakeRef.current;
+        shakeOffsetRef.current.x = (Math.random() - 0.5) * s;
+        shakeOffsetRef.current.y = (Math.random() - 0.5) * s;
+        raf = requestAnimationFrame(loop2);
       }
     };
     raf = requestAnimationFrame(loop);
@@ -210,8 +224,8 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
 
   if (exit && phase === 'done') return null;
 
-  const shakeX = shake > 0 ? (Math.random() - 0.5) * shake : 0;
-  const shakeY = shake > 0 ? (Math.random() - 0.5) * shake : 0;
+  const shakeX = shakeOffsetRef.current.x;
+  const shakeY = shakeOffsetRef.current.y;
   const showInsert = phase === 'insert';
   const showBooting = phase === 'booting' || phase === 'progress';
   const showProgress = phase === 'progress' || phase === 'flash' || phase === 'ready';
@@ -321,12 +335,16 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
         </div>
       )}
 
-      {/* loading bar */}
+      {/* loading bar — transform-based fill (no width animation) */}
       {showBar && (
         <div className="boot-bar-wrap pixel-border mt-5">
           <div
             className="boot-bar-fill h-full bg-gold"
-            style={{ width: `${progress}%`, transition: 'width 0.05s linear' }}
+            style={{
+              width: '100%',
+              transform: `translateX(${progress - 100}%)`,
+              willChange: 'transform',
+            }}
           />
         </div>
       )}

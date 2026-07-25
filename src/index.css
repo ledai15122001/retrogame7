@@ -937,6 +937,12 @@ body,
   100% { opacity: 0; transform: translate(-50%, -28px) scale(0.95); }
 }
 
+/* gentle idle breathing for the mascot — replaces a per-frame rAF setState */
+@keyframes mascot-idle-bob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
+}
+
 /* Respect reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *,

@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { HeroCanvas } from '@/components/HeroCanvas';
 import { Mascot } from '@/components/Mascot';
 import { PixelButton } from '@/components/ui/PixelButton';
 import { PixelSprite } from '@/components/sprites/PixelSprite';
 import { COIN_FRONT, PALETTE } from '@/components/sprites/sprites';
-import { useCopyState } from '@/hooks';
+import { useCopyState, useMouseLerp } from '@/hooks';
 import { sound } from '@/utils/sound';
 import { CoinMagnetCinematic } from '@/components/ui/CoinMagnetCinematic';
 
@@ -12,10 +12,48 @@ const CONTRACT = 'BUD5yD8mQK9pX2vN7rL4tZ3fW8hJ6cE1aF0sG7iU2oP';
 
 export function Hero() {
   const { copied, copy } = useCopyState();
-  const [buyHover, setBuyHover] = useState(false);
+  const [, setBuyHover] = useState(false);
+  const mouse = useMouseLerp();
+  const mascotWrapRef = useRef<HTMLDivElement | null>(null);
+  const coinLRef = useRef<HTMLDivElement | null>(null);
+  const coinRRef = useRef<HTMLDivElement | null>(null);
+  const heroRef = useRef<HTMLElement | null>(null);
+
+  // gentle DOM parallax for mascot (22px) + corner coins (30px),
+  // paused when the hero is off-screen. Composes with the cinematic's
+  // squash transform on the inner [data-mascot] element.
+  useEffect(() => {
+    const hero = heroRef.current;
+    if (!hero) return;
+    let visible = true;
+    const io = new IntersectionObserver(
+      (entries) => { visible = entries[0].isIntersecting; },
+      { threshold: 0.01 }
+    );
+    io.observe(hero);
+    let raf = 0;
+    const loop = () => {
+      if (visible) {
+        const mx = mouse.current.x;
+        const my = mouse.current.y;
+        if (mascotWrapRef.current) {
+          mascotWrapRef.current.style.transform = `translate(${(mx * 22).toFixed(2)}px, ${(my * 22).toFixed(2)}px)`;
+        }
+        if (coinLRef.current) {
+          coinLRef.current.style.transform = `translate(${(mx * 30).toFixed(2)}px, ${(my * 30).toFixed(2)}px)`;
+        }
+        if (coinRRef.current) {
+          coinRRef.current.style.transform = `translate(${(mx * 30).toFixed(2)}px, ${(my * 30).toFixed(2)}px)`;
+        }
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => { cancelAnimationFrame(raf); io.disconnect(); };
+  }, [mouse]);
 
   return (
-    <section id="top" className="relative min-h-screen w-full overflow-hidden">
+    <section id="top" ref={heroRef} className="relative min-h-screen w-full overflow-hidden">
       <HeroCanvas />
       <CoinMagnetCinematic />
 
@@ -36,8 +74,10 @@ export function Hero() {
         </p>
 
         {/* mascot */}
-        <div className="my-6 sm:my-8" data-mascot>
-          <Mascot size={3.4} />
+        <div ref={mascotWrapRef} className="my-6 sm:my-8" style={{ willChange: 'transform' }}>
+          <div data-mascot>
+            <Mascot size={3.4} />
+          </div>
         </div>
 
         {/* BUY + socials */}
@@ -100,10 +140,10 @@ export function Hero() {
       </div>
 
       {/* decorative spinning coins in corners */}
-      <div className="pointer-events-none absolute left-4 top-24 hidden sm:block">
+      <div ref={coinLRef} className="pointer-events-none absolute left-4 top-24 hidden sm:block" style={{ willChange: 'transform' }}>
         <PixelSprite grid={COIN_FRONT} palette={PALETTE} pixel={3} className="animate-bob coin-shimmer coin-sparkle" />
       </div>
-      <div className="pointer-events-none absolute right-6 top-32 hidden sm:block">
+      <div ref={coinRRef} className="pointer-events-none absolute right-6 top-32 hidden sm:block" style={{ willChange: 'transform' }}>
         <PixelSprite grid={COIN_FRONT} palette={PALETTE} pixel={3} className="animate-floaty coin-shimmer coin-sparkle" style={{ ['--sparkle-delay' as string]: '2.4s' }} />
       </div>
     </section>

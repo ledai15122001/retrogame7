@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useRaf, useWindowSize, useMousePos, usePrefersReducedMotion } from '@/hooks';
+import { useRaf, useWindowSize, useMouseLerp, usePrefersReducedMotion } from '@/hooks';
 import { palette } from '@/utils/theme';
 
 /**
@@ -49,8 +49,9 @@ interface Particle {
 export function HeroCanvas({ className = '' }: { className?: string }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const { w, h } = useWindowSize();
-  const mouse = useMousePos();
+  const mouse = useMouseLerp();
   const reduced = usePrefersReducedMotion();
+  const visibleRef = useRef(true);
 
   const state = useRef({
     clouds: [] as Cloud[],
@@ -99,7 +100,20 @@ export function HeroCanvas({ className = '' }: { className?: string }) {
     }));
   }, [w, h]);
 
+  // pause the render loop when the canvas scrolls out of view
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => { visibleRef.current = entries[0].isIntersecting; },
+      { threshold: 0.01 }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   useRaf((dt) => {
+    if (!visibleRef.current) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -123,6 +137,10 @@ export function HeroCanvas({ className = '' }: { className?: string }) {
 
     // read the live palette every frame so theme switches repaint instantly
     const p = palette();
+    // lerped parallax multipliers (desktop): sky 4, clouds 8, mountains 12,
+    // grass 16, mascot 22, foreground coins 30. mouse is normalized -1..1.
+    const mx = mouse.current.x;
+    const my = mouse.current.y;
 
     s.t += dt;
     if (!reduced) s.grassPhase += dt * 0.004;
@@ -151,8 +169,8 @@ export function HeroCanvas({ className = '' }: { className?: string }) {
     }
 
     // ---------- celestial body: moon (night) or sun (day) ----------
-    const cx = lowW - 60 - mouse.x * 6;
-    const cy = 36 + mouse.y * 4;
+    const cx = lowW - 60 - mx * 4;
+    const cy = 36 + my * 4;
     if (p.isDay) {
       // sun glow
       ctx.fillStyle = p.celestialGlow;
@@ -175,18 +193,18 @@ export function HeroCanvas({ className = '' }: { className?: string }) {
     s.clouds.forEach((c) => {
       if (!reduced) c.x += c.speed * (dt / 16);
       if (c.x > lowW + 40) c.x = -c.w - 10;
-      drawCloud(ctx, c.x + mouse.x * 4, c.y + mouse.y * 2, c.w, p);
+      drawCloud(ctx, c.x + mx * 8, c.y + my * 4, c.w, p);
     });
 
     // ---------- mountains ----------
-    drawMountains(ctx, 0, lowH * 0.62, lowW, 34, p.mountainFar, mouse.x * 5, p);
-    drawMountains(ctx, 0, lowH * 0.7, lowW, 46, p.mountainNear, mouse.x * 9, p);
+    drawMountains(ctx, 0, lowH * 0.62, lowW, 34, p.mountainFar, mx * 12, p);
+    drawMountains(ctx, 0, lowH * 0.7, lowW, 46, p.mountainNear, mx * 12, p);
 
     // ---------- trees ----------
     for (let i = 0; i < 8; i++) {
       const tx = (i * (lowW / 8) + (s.t * 0.003) % (lowW / 8)) - 10;
       const sway = reduced ? 0 : Math.sin(s.t / 1100 + i) * 1.5;
-      drawTree(ctx, tx + mouse.x * 7, lowH * 0.74, sway, p);
+      drawTree(ctx, tx + mx * 16, lowH * 0.74, sway, p);
     }
 
     // ---------- rolling hills ----------
@@ -204,7 +222,7 @@ export function HeroCanvas({ className = '' }: { className?: string }) {
       }
       const frame = Math.floor((s.t / 120) % 8);
       const edge = frame === 2 || frame === 6;
-      drawCoin(ctx, c.x + mouse.x * 10, c.y, edge, p);
+      drawCoin(ctx, c.x + mx * 30, c.y, edge, p);
     });
 
     // ---------- birds ----------
@@ -214,7 +232,7 @@ export function HeroCanvas({ className = '' }: { className?: string }) {
         b.flap += dt * 0.02;
         if (b.x > lowW + 20) b.x = -20;
       }
-      drawBird(ctx, b.x + mouse.x * 5, b.y, Math.sin(b.flap) > 0, p);
+      drawBird(ctx, b.x + mx * 16, b.y, Math.sin(b.flap) > 0, p);
     });
 
     // ---------- foreground grass ----------
@@ -224,7 +242,7 @@ export function HeroCanvas({ className = '' }: { className?: string }) {
     for (let i = 0; i < 6; i++) {
       const fx = (i * (lowW / 6)) + 10;
       const col = i % 2 === 0 ? p.flower1 : p.flower2;
-      drawFlower(ctx, fx + mouse.x * 12, lowH - 20, col, p);
+      drawFlower(ctx, fx + mx * 16, lowH - 20, col, p);
     }
 
     // ---------- fireflies / particles ----------

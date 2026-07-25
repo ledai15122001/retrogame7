@@ -8,7 +8,7 @@ import {
   PALETTE,
 } from '@/components/sprites/sprites';
 import { sound } from '@/utils/sound';
-import { useRaf, useMousePos, useRandomInterval } from '@/hooks';
+import { useMousePos, useRandomInterval } from '@/hooks';
 
 const MESSAGES = [
   'gm',
@@ -42,17 +42,12 @@ export function Mascot({ size = 3 }: { size?: number }) {
   const [bounceY, setBounceY] = useState(0);
   const [blink, setBlink] = useState(false);
 
-  const idlePhase = useRef(0);
   const ref = useRef<HTMLDivElement | null>(null);
   const dustId = useRef(0);
   const blinkTimer = useRef<number | undefined>(undefined);
 
-  // idle bounce via rAF (lightweight)
-  useRaf((_, t) => {
-    if (pose === 'jump') return;
-    idlePhase.current = t;
-    setBounceY(Math.sin(t / 600) * 6);
-  });
+  // idle bounce is a pure CSS animation (no per-frame re-renders);
+  // jump overrides it imperatively via the bounceY transform below.
 
   // random blink
   useEffect(() => {
@@ -135,7 +130,11 @@ export function Mascot({ size = 3 }: { size?: number }) {
     <div
       ref={ref}
       className="relative select-none"
-      style={{ transform: `translateY(${bounceY}px)`, transition: jumping ? 'transform 0.42s cubic-bezier(.5,0,.6,1)' : 'transform 0.18s ease-out' }}
+      style={{
+        transform: `translateY(${bounceY}px)`,
+        transition: jumping ? 'transform 0.42s cubic-bezier(.5,0,.6,1)' : 'transform 0.18s ease-out',
+        animation: pose === 'idle' ? 'mascot-idle-bob 1.2s ease-in-out infinite' : 'none',
+      }}
       onMouseEnter={onHover}
       onMouseLeave={() => setShowBubble(false)}
       onClick={jump}
