@@ -153,10 +153,10 @@ export function useMouseLerp() {
   const target = useRef({ x: 0, y: 0 });
   const current = useRef({ x: 0, y: 0 });
   useEffect(() => {
-    // Reduce parallax intensity on tablets, disable on phones.
-    const isTouch = window.matchMedia('(hover: none)').matches;
-    const isPhone = window.matchMedia('(max-width: 640px)').matches;
-    const intensity = isPhone ? 0 : isTouch ? 0.4 : 1;
+    // Disable parallax only on phones (small screen + touch pointer).
+    // Desktop and tablets keep full intensity — behavior unchanged.
+    const isPhone = window.matchMedia('(max-width: 640px) and (pointer: coarse)').matches;
+    const intensity = isPhone ? 0 : 1;
 
     const onMove = (e: MouseEvent) => {
       if (intensity === 0) return;
