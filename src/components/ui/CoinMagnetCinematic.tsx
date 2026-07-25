@@ -120,8 +120,8 @@ export function CoinMagnetCinematic() {
     co.sparkleTimer = 0;
     const el = coinEls.current[idx];
     const sideEl = coinSideEls.current[idx];
-    if (el) { el.style.opacity = '1'; el.style.display = 'block'; }
-    if (sideEl) { sideEl.style.opacity = '1'; sideEl.style.display = 'block'; }
+    if (el) { el.style.opacity = '1'; el.style.display = 'block'; el.style.willChange = 'transform'; }
+    if (sideEl) { sideEl.style.opacity = '1'; sideEl.style.display = 'block'; sideEl.style.willChange = 'transform'; }
   };
 
   const spawnSparkle = (x: number, y: number, burst = false) => {
@@ -138,7 +138,7 @@ export function CoinMagnetCinematic() {
     sp.max = burst ? 0.6 + Math.random() * 0.4 : 0.4 + Math.random() * 0.3;
     sp.size = burst ? 1.2 + Math.random() * 0.6 : 0.8;
     const el = sparkEls.current[idx];
-    if (el) el.style.display = 'block';
+    if (el) { el.style.display = 'block'; el.style.willChange = 'transform, opacity'; }
   };
 
   // main orchestration + rAF loop
@@ -148,7 +148,7 @@ export function CoinMagnetCinematic() {
     if (sessionStorage.getItem(SESSION_KEY)) return;
     sessionStorage.setItem(SESSION_KEY, '1');
 
-    console.log('[Cinematic] Cinematic Mounted');
+    // [Cinematic] Cinematic Mounted
 
     const timers: number[] = [];
     let cancelled = false;
@@ -157,10 +157,11 @@ export function CoinMagnetCinematic() {
     let raf = 0;
     let waitRaf = 0;
     let bootDelay = 0;
+    let tabHidden = false;
 
     const onBooted = () => {
       if (started || cancelled) return;
-      console.log('[Cinematic] BootScreen Finished');
+      // [Cinematic] BootScreen Finished
       window.removeEventListener('bootscreen:finished', onBooted);
       bootDelay = window.setTimeout(() => {
         if (cancelled || started) return;
@@ -178,12 +179,12 @@ export function CoinMagnetCinematic() {
     const startCinematic = () => {
       if (cancelled || started) return;
       started = true;
-      console.log('[Cinematic] Cinematic Started');
+      // [Cinematic] Cinematic Started
       setPhase('first');
       phaseRef.current = 'first';
       const c = mascotCenter.current;
       spawnCoin(c.x + (Math.random() - 0.5) * 60, 1);
-      console.log('[Cinematic] First Coin Spawned');
+      // [Cinematic] First Coin Spawned
       lookUpRef.current = true;
       sound.tap();
 
@@ -237,9 +238,9 @@ export function CoinMagnetCinematic() {
       if (cancelled) return;
       if (firstFrame) {
         firstFrame = false;
-        console.log('[Cinematic] First Physics Frame');
+        // [Cinematic] First Physics Frame
       }
-      if (visibleRef.current) {
+      if (visibleRef.current && !tabHidden) {
         const dt = Math.min((now - last) / 1000, 0.05);
         last = now;
         const c = mascotCenter.current;
@@ -294,12 +295,12 @@ export function CoinMagnetCinematic() {
           if (el) {
             el.style.transform = `translate(${co.x}px, ${co.y}px) rotate(${co.rot}rad) scale(${co.size})`;
             el.style.opacity = showSide ? '0' : (co.state === 'done' ? '0' : '1');
-            if (co.state === 'done') el.style.display = 'none';
+            if (co.state === 'done') { el.style.display = 'none'; el.style.willChange = 'auto'; }
           }
           if (sideEl) {
             sideEl.style.transform = `translate(${co.x}px, ${co.y}px) rotate(${co.rot}rad) scale(${co.size})`;
             sideEl.style.opacity = showSide ? (co.state === 'done' ? '0' : '1') : '0';
-            if (co.state === 'done') sideEl.style.display = 'none';
+            if (co.state === 'done') { sideEl.style.display = 'none'; sideEl.style.willChange = 'auto'; }
           }
         }
 
@@ -316,7 +317,7 @@ export function CoinMagnetCinematic() {
           if (el) {
             el.style.transform = `translate(${sp.x}px, ${sp.y}px) scale(${sp.size * (0.5 + a * 0.5)})`;
             el.style.opacity = String(a);
-            if (sp.life >= sp.max) el.style.display = 'none';
+            if (sp.life >= sp.max) { el.style.display = 'none'; el.style.willChange = 'auto'; }
           }
         }
 
@@ -356,12 +357,16 @@ export function CoinMagnetCinematic() {
       } else {
         last = now;
       }
+      // Stop the physics loop entirely once the cinematic is done.
+      if (phaseRef.current === 'done') return;
       raf = requestAnimationFrame(loop);
     };
 
     // The bootscreen:finished event is the ONLY trigger.
     // No rAF, no setTimeout, no coins, no physics until it fires.
     window.addEventListener('bootscreen:finished', onBooted);
+    const onTabVis = () => { tabHidden = document.hidden; };
+    document.addEventListener('visibilitychange', onTabVis);
 
     return () => {
       cancelled = true;
@@ -370,6 +375,7 @@ export function CoinMagnetCinematic() {
       timers.forEach((t) => window.clearTimeout(t));
       window.clearTimeout(bootDelay);
       window.removeEventListener('bootscreen:finished', onBooted);
+      document.removeEventListener('visibilitychange', onTabVis);
       if (ioCleanup) ioCleanup();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -392,14 +398,23 @@ export function CoinMagnetCinematic() {
     let active = false;
 
     const loop = () => {
-      const el = document.querySelector('[data-mascot]') as HTMLElement | null;
-      if (el) {
-        const sq = squashRef.current || 0;
-        const sx = 1 - sq * 0.18;
-        const sy = 1 + sq * 0.18;
-        const look = lookUpRef.current ? -6 : 0;
-        el.style.transform = `translateY(${look}px) scale(${sx}, ${sy})`;
-        el.style.transformOrigin = 'center bottom';
+      if (active && !document.hidden) {
+        const el = document.querySelector('[data-mascot]') as HTMLElement | null;
+        if (el) {
+          const sq = squashRef.current || 0;
+          const sx = 1 - sq * 0.18;
+          const sy = 1 + sq * 0.18;
+          const look = lookUpRef.current ? -6 : 0;
+          el.style.transform = `translateY(${look}px) scale(${sx}, ${sy})`;
+          el.style.transformOrigin = 'center bottom';
+        }
+        // Stop the loop once the cinematic is fully done and effects have settled.
+        if (phaseRef.current === 'done' && squashRef.current === 0 && glowValRef.current === 0) {
+          active = false;
+          const el2 = document.querySelector('[data-mascot]') as HTMLElement | null;
+          if (el2) { el2.style.transform = ''; el2.style.transformOrigin = ''; }
+          return;
+        }
       }
       raf = requestAnimationFrame(loop);
     };
@@ -449,13 +464,13 @@ export function CoinMagnetCinematic() {
       {/* coin pool — front + side faces stacked, toggled by opacity */}
       <div ref={coinLayerRef} className="absolute inset-0">
         {Array.from({ length: COIN_POOL }).map((_, i) => (
-          <div key={i} style={{ position: 'absolute', left: 0, top: 0, willChange: 'transform', opacity: 0, display: 'none' }}
+          <div key={i} style={{ position: 'absolute', left: 0, top: 0, opacity: 0, display: 'none' }}
             ref={(el) => { coinEls.current[i] = el; }}>
             <PixelSprite grid={COIN_FRONT} palette={PALETTE} pixel={3} scale={1.4} />
           </div>
         ))}
         {Array.from({ length: COIN_POOL }).map((_, i) => (
-          <div key={`s${i}`} style={{ position: 'absolute', left: 0, top: 0, willChange: 'transform', opacity: 0, display: 'none' }}
+          <div key={`s${i}`} style={{ position: 'absolute', left: 0, top: 0, opacity: 0, display: 'none' }}
             ref={(el) => { coinSideEls.current[i] = el; }}>
             <PixelSprite grid={COIN_SIDE} palette={PALETTE} pixel={3} scale={1.4} />
           </div>
@@ -470,7 +485,7 @@ export function CoinMagnetCinematic() {
               position: 'absolute', left: 0, top: 0, width: 4, height: 4,
               background: '#fff', borderRadius: '50%',
               boxShadow: '0 0 6px #ffd23f',
-              willChange: 'transform, opacity', opacity: 0, display: 'none',
+              opacity: 0, display: 'none',
             }}
           />
         ))}

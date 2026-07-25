@@ -60,34 +60,38 @@ export function HeroCanvas({ className = '' }: { className?: string }) {
     initH: 0,
   });
 
-  // (re)init actors when size changes
+  // (re)init actors when size changes — fewer actors on small screens
   useEffect(() => {
     const s = state.current;
     const vw = Math.max(320, w);
     const vh = Math.max(400, h);
+    const isMobile = vw < 640;
+    const isTablet = vw < 1024;
     s.initW = vw;
     s.initH = vh;
-    s.clouds = Array.from({ length: 5 }, (_, i) => ({
-      x: (i / 5) * vw + Math.random() * 120,
+    const cloudCount = isMobile ? 2 : isTablet ? 3 : 5;
+    s.clouds = Array.from({ length: cloudCount }, (_, i) => ({
+      x: (i / cloudCount) * vw + Math.random() * 120,
       y: 40 + Math.random() * (vh * 0.32),
       speed: 0.15 + Math.random() * 0.25,
       w: 28 + Math.floor(Math.random() * 20),
     }));
-    s.birds = Array.from({ length: 3 }, () => ({
+    s.birds = Array.from({ length: isMobile ? 1 : 3 }, () => ({
       x: Math.random() * vw,
       y: 60 + Math.random() * (vh * 0.25),
       speed: 0.4 + Math.random() * 0.5,
       flap: Math.random() * Math.PI * 2,
     }));
-    s.coins = Array.from({ length: 7 }, (_, i) => ({
-      x: (i / 7) * vw + Math.random() * 80,
+    const coinCount = isMobile ? 3 : 7;
+    s.coins = Array.from({ length: coinCount }, (_, i) => ({
+      x: (i / coinCount) * vw + Math.random() * 80,
       baseY: vh * 0.4 + Math.random() * (vh * 0.25),
       y: 0,
       phase: Math.random() * Math.PI * 2,
       collected: false,
     }));
     s.coins.forEach((c) => (c.y = c.baseY));
-    s.fireflies = Array.from({ length: 26 }, () => ({
+    s.fireflies = Array.from({ length: isMobile ? 8 : isTablet ? 16 : 26 }, () => ({
       x: Math.random() * vw,
       y: vh * 0.2 + Math.random() * (vh * 0.5),
       phase: Math.random() * Math.PI * 2,

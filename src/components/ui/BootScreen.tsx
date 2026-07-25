@@ -46,17 +46,20 @@ const T_DONE = 4600; // unmount
 export function BootScreen({ onDone }: { onDone: () => void }) {
   const reduced = usePrefersReducedMotion();
   const [phase, setPhase] = useState<Phase>('insert');
-  const [progress, setProgress] = useState(0);
   const [typedLines, setTypedLines] = useState<string[]>([]);
   const [exit, setExit] = useState(false);
   const [coinDropping, setCoinDropping] = useState(false);
-  const [coinY, setCoinY] = useState(0);
   const [slotGlow, setSlotGlow] = useState(false);
   const [showSpark, setShowSpark] = useState(false);
   const [showFlash, setShowFlash] = useState(false);
   const [showSparkles, setShowSparkles] = useState(false);
   const shakeRef = useRef(0);
   const shakeOffsetRef = useRef({ x: 0, y: 0 });
+
+  // Refs for imperative DOM updates (avoid per-frame React re-renders).
+  const coinRef = useRef<HTMLDivElement | null>(null);
+  const barFillRef = useRef<HTMLDivElement | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
 
   const rafRef = useRef<number>(0);
   const barStartRef = useRef<number>(0);
@@ -129,12 +132,7 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
       );
     });
 
-    // 1.90s — bar hits 100%, pause 200ms, then flash + ping
-    timers.push(
-      window.setTimeout(() => {
-        setProgress(100);
-      }, T_PROGRESS_END)
-    );
+    // 1.90s — bar hits 100% (imperative, no setState needed)
     timers.push(
       window.setTimeout(() => {
         setPhase('flash');
@@ -181,11 +179,13 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
     const loop = (now: number) => {
       const t = Math.min(1, (now - start) / dur);
       const y = dropDist * (t * t);
-      setCoinY(y);
+      if (coinRef.current) coinRef.current.style.transform = `translateY(${y}px)`;
+      if (coinRef.current) coinRef.current.style.opacity = (coinDropping && y > 140) ? '0' : '1';
       if (shakeRef.current > 0) {
         const s = shakeRef.current;
         shakeOffsetRef.current.x = (Math.random() - 0.5) * s;
         shakeOffsetRef.current.y = (Math.random() - 0.5) * s;
+        if (rootRef.current) rootRef.current.style.transform = `translate(${shakeOffsetRef.current.x}px, ${shakeOffsetRef.current.y}px)`;
       }
       if (t < 1) {
         raf = requestAnimationFrame(loop);
@@ -204,7 +204,10 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
         const s = shakeRef.current;
         shakeOffsetRef.current.x = (Math.random() - 0.5) * s;
         shakeOffsetRef.current.y = (Math.random() - 0.5) * s;
+        if (rootRef.current) rootRef.current.style.transform = `translate(${shakeOffsetRef.current.x}px, ${shakeOffsetRef.current.y}px)`;
         raf = requestAnimationFrame(loop2);
+      } else {
+        if (rootRef.current) rootRef.current.style.transform = '';
       }
     };
     raf = requestAnimationFrame(loop);
@@ -220,7 +223,7 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
     const step = (now: number) => {
       const t = Math.min(1, (now - barStartRef.current) / dur);
       const eased = 1 - Math.pow(1 - t, 2.4); // smooth ease-out
-      setProgress(eased * 100);
+      if (barFillRef.current) barFillRef.current.style.transform = `translateX(${eased * 100 - 100}%)`;
       if (t < 1) rafRef.current = requestAnimationFrame(step);
     };
     rafRef.current = requestAnimationFrame(step);
@@ -229,8 +232,6 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
 
   if (exit && phase === 'done') return null;
 
-  const shakeX = shakeOffsetRef.current.x;
-  const shakeY = shakeOffsetRef.current.y;
   const showInsert = phase === 'insert';
   const showBooting = phase === 'booting' || phase === 'progress';
   const showProgress = phase === 'progress' || phase === 'flash' || phase === 'ready';
@@ -239,11 +240,11 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
 
   return (
     <div
+      ref={rootRef}
       className="boot-screen fixed inset-0 z-[10000] flex flex-col items-center justify-center bg-black"
       style={{
         opacity: exit ? 0 : 1,
-        transform: `translate(${shakeX}px, ${shakeY}px)`,
-        transition: 'opacity 0.35s ease-out, transform 0.05s linear',
+        transition: 'opacity 0.35s ease-out',
         animation: 'boot-fade-in 0.5s ease-out both',
       }}
       aria-hidden
@@ -281,10 +282,9 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
         <div className="relative flex flex-col items-center" style={{ marginBottom: 60 }}>
           {/* floating / dropping coin */}
           <div
+            ref={coinRef}
             className={coinDropping ? '' : 'boot-coin-idle'}
             style={{
-              transform: `translateY(${coinY}px)`,
-              opacity: coinDropping && coinY > 140 ? 0 : 1,
               transition: 'opacity 0.08s linear',
             }}
           >
@@ -344,11 +344,11 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
       {showBar && (
         <div className="boot-bar-wrap pixel-border mt-5">
           <div
+            ref={barFillRef}
             className="boot-bar-fill h-full bg-gold"
             style={{
               width: '100%',
-              transform: `translateX(${progress - 100}%)`,
-              willChange: 'transform',
+              transform: 'translateX(-100%)',
             }}
           />
         </div>

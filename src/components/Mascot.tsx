@@ -140,8 +140,21 @@ export function Mascot({ size = 3 }: { size?: number }) {
       if (pupilRRef.current) pupilRRef.current.style.transform = `translate(${rx}px, ${ry}px)`;
       raf = requestAnimationFrame(loop);
     };
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
+    const start = () => { raf = requestAnimationFrame(loop); };
+    const onVis = () => {
+      if (document.hidden) {
+        cancelAnimationFrame(raf);
+        raf = 0;
+      } else if (!raf) {
+        start();
+      }
+    };
+    start();
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      cancelAnimationFrame(raf);
+      document.removeEventListener('visibilitychange', onVis);
+    };
   }, [mouse, size]);
 
   const currentGrid = pose === 'jump' ? MASCOT_JUMP : pose === 'wave' ? MASCOT_WINK : MASCOT_BODY;

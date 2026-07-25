@@ -26,14 +26,17 @@ export function Hero() {
     const hero = heroRef.current;
     if (!hero) return;
     let visible = true;
+    let tabHidden = false;
     const io = new IntersectionObserver(
       (entries) => { visible = entries[0].isIntersecting; },
       { threshold: 0.01 }
     );
     io.observe(hero);
+    const onVis = () => { tabHidden = document.hidden; };
+    document.addEventListener('visibilitychange', onVis);
     let raf = 0;
     const loop = () => {
-      if (visible) {
+      if (visible && !tabHidden) {
         const mx = mouse.current.x;
         const my = mouse.current.y;
         if (mascotWrapRef.current) {
@@ -49,7 +52,11 @@ export function Hero() {
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
-    return () => { cancelAnimationFrame(raf); io.disconnect(); };
+    return () => {
+      cancelAnimationFrame(raf);
+      io.disconnect();
+      document.removeEventListener('visibilitychange', onVis);
+    };
   }, [mouse]);
 
   return (

@@ -49,7 +49,7 @@ export function useWindowSize(delay = 150) {
   return size;
 }
 
-/** rAF loop that calls a callback with a delta in ms. */
+/** rAF loop that calls a callback with a delta in ms. Pauses when the tab is hidden. */
 export function useRaf(callback: (dt: number, t: number) => void, active = true) {
   const cb = useRef(callback);
   cb.current = callback;
@@ -63,8 +63,24 @@ export function useRaf(callback: (dt: number, t: number) => void, active = true)
       cb.current(dt, now);
       raf = requestAnimationFrame(loop);
     };
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
+    const start = () => {
+      last = performance.now();
+      raf = requestAnimationFrame(loop);
+    };
+    const onVis = () => {
+      if (document.hidden) {
+        cancelAnimationFrame(raf);
+        raf = 0;
+      } else if (!raf) {
+        start();
+      }
+    };
+    start();
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      cancelAnimationFrame(raf);
+      document.removeEventListener('visibilitychange', onVis);
+    };
   }, [active]);
 }
 
@@ -137,14 +153,20 @@ export function useMouseLerp() {
   const target = useRef({ x: 0, y: 0 });
   const current = useRef({ x: 0, y: 0 });
   useEffect(() => {
+    // Reduce parallax intensity on tablets, disable on phones.
+    const isTouch = window.matchMedia('(hover: none)').matches;
+    const isPhone = window.matchMedia('(max-width: 640px)').matches;
+    const intensity = isPhone ? 0 : isTouch ? 0.4 : 1;
+
     const onMove = (e: MouseEvent) => {
-      target.current.x = (e.clientX / window.innerWidth) * 2 - 1;
-      target.current.y = (e.clientY / window.innerHeight) * 2 - 1;
+      if (intensity === 0) return;
+      target.current.x = ((e.clientX / window.innerWidth) * 2 - 1) * intensity;
+      target.current.y = ((e.clientY / window.innerHeight) * 2 - 1) * intensity;
     };
     const onOrient = (e: DeviceOrientationEvent) => {
       if (e.gamma == null || e.beta == null) return;
-      target.current.x = Math.max(-1, Math.min(1, e.gamma / 30));
-      target.current.y = Math.max(-1, Math.min(1, (e.beta - 30) / 30));
+      target.current.x = Math.max(-1, Math.min(1, e.gamma / 30)) * intensity;
+      target.current.y = Math.max(-1, Math.min(1, (e.beta - 30) / 30)) * intensity;
     };
     window.addEventListener('mousemove', onMove, { passive: true });
     window.addEventListener('deviceorientation', onOrient, { passive: true });
@@ -154,11 +176,22 @@ export function useMouseLerp() {
       current.current.y += (target.current.y - current.current.y) * 0.08;
       raf = requestAnimationFrame(loop);
     };
-    raf = requestAnimationFrame(loop);
+    const start = () => { raf = requestAnimationFrame(loop); };
+    const onVis = () => {
+      if (document.hidden) {
+        cancelAnimationFrame(raf);
+        raf = 0;
+      } else if (!raf) {
+        start();
+      }
+    };
+    start();
+    document.addEventListener('visibilitychange', onVis);
     return () => {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('deviceorientation', onOrient);
       cancelAnimationFrame(raf);
+      document.removeEventListener('visibilitychange', onVis);
     };
   }, []);
   return current;

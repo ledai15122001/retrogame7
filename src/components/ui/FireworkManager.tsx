@@ -21,6 +21,8 @@ const PX = 4; // size of one "pixel" block in css px (matches old Hero SCALE)
 const MAX_FIREWORKS = 5;
 const COIN_CHANCE = 0.15;
 
+const isMobile = () => window.matchMedia('(max-width: 640px)').matches;
+
 interface Particle {
   x: number;
   y: number;
@@ -77,10 +79,13 @@ export function FireworkManager() {
     resize();
     window.addEventListener('resize', resize, { passive: true });
 
-    const spawn = (cx: number, cy: number) => {
+    let spawn = (cx: number, cy: number) => {
       const fw: Firework = { particles: [], coin: null };
-      // small variation in count + radius
-      const count = 8 + Math.floor(Math.random() * 5); // 8..12
+      const mobile = isMobile();
+      // small variation in count + radius (fewer particles on mobile)
+      const count = mobile
+        ? 5 + Math.floor(Math.random() * 3) // 5..7
+        : 8 + Math.floor(Math.random() * 5); // 8..12
       const radius = 0.85 + Math.random() * 0.35; // 0.85..1.20
       // color order variation: occasionally lead with pink
       const colors = Math.random() < 0.5 ? [COLORS[0], COLORS[1]] : [COLORS[1], COLORS[0]];
@@ -97,8 +102,8 @@ export function FireworkManager() {
           size: 1 + Math.floor(Math.random() * 2),
         });
       }
-      // 15% chance: tiny spinning coin pop
-      if (Math.random() < COIN_CHANCE) {
+      // 15% chance: tiny spinning coin pop (skip on mobile for perf)
+      if (!mobile && Math.random() < COIN_CHANCE) {
         const ang = Math.random() * Math.PI * 2;
         const spd = (0.6 + Math.random() * 0.5) * PX;
         fw.coin = {
@@ -122,11 +127,28 @@ export function FireworkManager() {
       // ignore right-click / middle-click
       if (e.button !== 0) return;
       spawn(e.clientX, e.clientY);
+      ensureRunning();
     };
     window.addEventListener('pointerdown', onPointerDown, { passive: true });
 
     let raf = 0;
     let last = performance.now();
+    let running = false;
+    const start = () => {
+      if (running) return;
+      running = true;
+      last = performance.now();
+      raf = requestAnimationFrame(loop);
+    };
+    const stop = () => {
+      running = false;
+      cancelAnimationFrame(raf);
+      raf = 0;
+    };
+    const onVis = () => {
+      if (document.hidden) stop();
+      else if (fireworksRef.current.length > 0) start();
+    };
     const loop = (now: number) => {
       const dt = Math.min(now - last, 50);
       last = now;
@@ -136,6 +158,11 @@ export function FireworkManager() {
       ctx.clearRect(0, 0, w, h);
 
       const list = fireworksRef.current;
+      // If nothing to draw, clear once and stop the loop.
+      if (list.length === 0) {
+        stop();
+        return;
+      }
       for (let fi = list.length - 1; fi >= 0; fi--) {
         const fw = list[fi];
         let alive = false;
@@ -178,10 +205,13 @@ export function FireworkManager() {
 
       raf = requestAnimationFrame(loop);
     };
-    raf = requestAnimationFrame(loop);
+    // Start the loop only when a firework is actually spawned.
+    const ensureRunning = () => { if (!document.hidden) start(); };
+    document.addEventListener('visibilitychange', onVis);
 
     return () => {
-      cancelAnimationFrame(raf);
+      stop();
+      document.removeEventListener('visibilitychange', onVis);
       window.removeEventListener('resize', resize);
       window.removeEventListener('pointerdown', onPointerDown);
     };
@@ -206,6 +236,11 @@ export function FireworkManager() {
   );
 }
 
+const SPRITE_COLOR_MAP: Record<string, string> = {
+  k: PALETTE.k, o: PALETTE.o, O: PALETTE.O, d: PALETTE.d, w: PALETTE.w,
+  e: PALETTE.e, p: PALETTE.p,
+};
+
 /** Draws a character-grid sprite onto the canvas at (x,y) with a given pixel size. */
 function drawSpriteGrid(
   ctx: CanvasRenderingContext2D,
@@ -214,10 +249,6 @@ function drawSpriteGrid(
   y: number,
   px: number
 ) {
-  const map: Record<string, string> = {
-    k: PALETTE.k, o: PALETTE.o, O: PALETTE.O, d: PALETTE.d, w: PALETTE.w,
-    e: PALETTE.e, p: PALETTE.p,
-  };
   const ox = Math.round(x - (grid[0].length * px) / 2);
   const oy = Math.round(y - (grid.length * px) / 2);
   for (let yy = 0; yy < grid.length; yy++) {
@@ -225,7 +256,7 @@ function drawSpriteGrid(
     for (let xx = 0; xx < row.length; xx++) {
       const ch = row[xx];
       if (ch === ' ' || ch === '.') continue;
-      const col = map[ch];
+      const col = SPRITE_COLOR_MAP[ch];
       if (!col) continue;
       ctx.fillStyle = col;
       ctx.fillRect(ox + xx * px, oy + yy * px, Math.ceil(px), Math.ceil(px));
