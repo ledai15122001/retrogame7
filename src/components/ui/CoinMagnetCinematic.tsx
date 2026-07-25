@@ -148,35 +148,42 @@ export function CoinMagnetCinematic() {
     if (sessionStorage.getItem(SESSION_KEY)) return;
     sessionStorage.setItem(SESSION_KEY, '1');
 
+    console.log('[Cinematic] Cinematic Mounted');
+
     const timers: number[] = [];
     let cancelled = false;
-    let booted = false;
-    let bootRaf = 0;
+    let started = false;
+    let firstFrame = true;
+    let raf = 0;
+    let waitRaf = 0;
+    let bootDelay = 0;
 
     const onBooted = () => {
-      if (booted || cancelled) return;
-      booted = true;
+      if (started || cancelled) return;
+      console.log('[Cinematic] BootScreen Finished');
       window.removeEventListener('bootscreen:finished', onBooted);
-      // give the hero ~800ms to breathe before the cinematic begins
-      bootRaf = window.setTimeout(() => {
-        if (cancelled) return;
+      bootDelay = window.setTimeout(() => {
+        if (cancelled || started) return;
         if (measure()) startCinematic();
-        else requestAnimationFrame(waitForMascot);
+        else waitRaf = requestAnimationFrame(waitForMascot);
       }, 800);
     };
 
     const waitForMascot = () => {
-      if (cancelled) return;
+      if (cancelled || started) return;
       if (measure()) startCinematic();
-      else requestAnimationFrame(waitForMascot);
+      else waitRaf = requestAnimationFrame(waitForMascot);
     };
 
     const startCinematic = () => {
-      if (cancelled) return;
+      if (cancelled || started) return;
+      started = true;
+      console.log('[Cinematic] Cinematic Started');
       setPhase('first');
       phaseRef.current = 'first';
       const c = mascotCenter.current;
       spawnCoin(c.x + (Math.random() - 0.5) * 60, 1);
+      console.log('[Cinematic] First Coin Spawned');
       lookUpRef.current = true;
       sound.tap();
 
@@ -208,18 +215,11 @@ export function CoinMagnetCinematic() {
           });
         }, 2900)
       );
+
+      // Start the physics loop ONLY now — never before.
+      last = performance.now();
+      raf = requestAnimationFrame(loop);
     };
-
-    requestAnimationFrame(waitForMascot);
-
-    // Synchronize with the BootScreen: only begin after it has fully
-    // faded out, regardless of how long it actually took.
-    window.addEventListener('bootscreen:finished', onBooted);
-    // Fallback: if there's no boot screen at all (e.g. already-played
-    // session), kick off after a short delay.
-    const fallback = window.setTimeout(() => {
-      if (!booted && !cancelled) onBooted();
-    }, 1200);
 
     const container = containerRef.current;
     let ioCleanup: (() => void) | undefined;
@@ -233,9 +233,12 @@ export function CoinMagnetCinematic() {
     }
 
     let last = performance.now();
-    let raf = 0;
     const loop = (now: number) => {
       if (cancelled) return;
+      if (firstFrame) {
+        firstFrame = false;
+        console.log('[Cinematic] First Physics Frame');
+      }
       if (visibleRef.current) {
         const dt = Math.min((now - last) / 1000, 0.05);
         last = now;
@@ -355,14 +358,17 @@ export function CoinMagnetCinematic() {
       }
       raf = requestAnimationFrame(loop);
     };
-    raf = requestAnimationFrame(loop);
+
+    // The bootscreen:finished event is the ONLY trigger.
+    // No rAF, no setTimeout, no coins, no physics until it fires.
+    window.addEventListener('bootscreen:finished', onBooted);
 
     return () => {
       cancelled = true;
       cancelAnimationFrame(raf);
+      cancelAnimationFrame(waitRaf);
       timers.forEach((t) => window.clearTimeout(t));
-      window.clearTimeout(bootRaf);
-      window.clearTimeout(fallback);
+      window.clearTimeout(bootDelay);
       window.removeEventListener('bootscreen:finished', onBooted);
       if (ioCleanup) ioCleanup();
     };
@@ -377,10 +383,14 @@ export function CoinMagnetCinematic() {
     return () => window.removeEventListener('resize', onResize);
   }, [reduced, measure]);
 
-  // squash-and-stretch + look-up applied imperatively to the real mascot
+  // squash-and-stretch + look-up applied imperatively to the real mascot.
+  // Gated on bootscreen:finished — nothing touches the mascot before the
+  // boot screen has fully faded out.
   useEffect(() => {
     if (reduced) return;
     let raf = 0;
+    let active = false;
+
     const loop = () => {
       const el = document.querySelector('[data-mascot]') as HTMLElement | null;
       if (el) {
@@ -393,9 +403,19 @@ export function CoinMagnetCinematic() {
       }
       raf = requestAnimationFrame(loop);
     };
-    raf = requestAnimationFrame(loop);
+
+    const onBooted = () => {
+      if (active) return;
+      active = true;
+      window.removeEventListener('bootscreen:finished', onBooted);
+      raf = requestAnimationFrame(loop);
+    };
+
+    window.addEventListener('bootscreen:finished', onBooted);
+
     return () => {
       cancelAnimationFrame(raf);
+      window.removeEventListener('bootscreen:finished', onBooted);
       const el = document.querySelector('[data-mascot]') as HTMLElement | null;
       if (el) { el.style.transform = ''; el.style.transformOrigin = ''; }
     };
