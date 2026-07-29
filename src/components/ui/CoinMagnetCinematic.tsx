@@ -38,10 +38,19 @@ interface Coin {
   vrot: number;
   side: boolean;
   size: number;
-  state: 'falling' | 'magnetized' | 'done';
+  state: 'falling' | 'magnetized' | 'merging' | 'done';
   curveBias: number;
   sparkleTimer: number;
+  magnetTime: number;
+  mergeT: number;
+  mergeFromX: number;
+  mergeFromY: number;
 }
+
+const MERGE_RADIUS = 30;
+const MERGE_TOLERANCE = 0.5;
+const MAGNET_FAILSAFE = 2.5;
+const MERGE_DURATION = 0.18;
 
 interface Sparkle {
   x: number;
@@ -71,6 +80,7 @@ export function CoinMagnetCinematic() {
     Array.from({ length: COIN_POOL }, () => ({
       x: 0, y: 0, vx: 0, vy: 0, rot: 0, vrot: 0, side: false,
       size: 1, state: 'done', curveBias: 0, sparkleTimer: 0,
+      magnetTime: 0, mergeT: 0, mergeFromX: 0, mergeFromY: 0,
     }))
   );
   const sparkles = useRef<Sparkle[]>(
@@ -117,6 +127,10 @@ export function CoinMagnetCinematic() {
     co.state = 'falling';
     co.curveBias = (Math.random() - 0.5) * 120;
     co.sparkleTimer = 0;
+    co.magnetTime = 0;
+    co.mergeT = 0;
+    co.mergeFromX = 0;
+    co.mergeFromY = 0;
     const el = coinEls.current[idx];
     const sideEl = coinSideEls.current[idx];
     if (el) { el.style.opacity = '1'; el.style.display = 'block'; el.style.willChange = 'transform'; }
@@ -250,6 +264,7 @@ export function CoinMagnetCinematic() {
             co.y += co.vy * dt;
             co.rot += co.vrot * dt;
           } else if (co.state === 'magnetized') {
+            co.magnetTime += dt;
             const dx = c.x - co.x;
             const dy = c.y - co.y;
             const dist = Math.hypot(dx, dy) || 1;
@@ -276,13 +291,26 @@ export function CoinMagnetCinematic() {
               co.sparkleTimer = 0;
               spawnSparkle(co.x, co.y);
             }
-            if (dist < 28) {
-              co.state = 'done';
+            if (dist < MERGE_RADIUS - MERGE_TOLERANCE || co.magnetTime >= MAGNET_FAILSAFE) {
+              co.state = 'merging';
+              co.mergeT = 0;
+              co.mergeFromX = co.x;
+              co.mergeFromY = co.y;
               for (let k = 0; k < 6; k++) spawnSparkle(c.x, c.y, true);
               shakeRef.current = 1;
               glowValRef.current = 1;
               squashRef.current = 1;
               sound.coin();
+            }
+          } else if (co.state === 'merging') {
+            co.mergeT += dt / MERGE_DURATION;
+            const t = Math.min(1, co.mergeT);
+            const e = 1 - Math.pow(1 - t, 2);
+            co.x = co.mergeFromX + (c.x - co.mergeFromX) * e;
+            co.y = co.mergeFromY + (c.y - co.mergeFromY) * e;
+            co.rot += co.vrot * dt * 2.5;
+            if (t >= 1) {
+              co.state = 'done';
             }
           }
           const el = coinEls.current[i];
