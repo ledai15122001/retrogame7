@@ -13,7 +13,16 @@ const CONTRACT = 'BUD5yD8mQK9pX2vN7rL4tZ3fW8hJ6cE1aF0sG7iU2oP';
 export function Hero() {
   const { copied, copy } = useCopyState();
   const [, setBuyHover] = useState(false);
+  const [mascotSize, setMascotSize] = useState(() =>
+    typeof window !== 'undefined' && window.innerWidth < 640 ? 2.2 : 3.4
+  );
   const mouse = useMouseLerp();
+
+  useEffect(() => {
+    const onResize = () => setMascotSize(window.innerWidth < 640 ? 2.2 : 3.4);
+    window.addEventListener('resize', onResize, { passive: true });
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
   const mascotWrapRef = useRef<HTMLDivElement | null>(null);
   const coinLRef = useRef<HTMLDivElement | null>(null);
   const coinRRef = useRef<HTMLDivElement | null>(null);
@@ -65,7 +74,7 @@ export function Hero() {
       <CoinMagnetCinematic />
 
       {/* content */}
-      <div className="relative z-10 mx-auto flex min-h-screen max-w-6xl flex-col items-center justify-center px-4 pt-28 pb-16 text-center">
+      <div className="relative z-10 mx-auto flex min-h-screen max-w-6xl flex-col items-center justify-center px-4 pb-16 pt-20 text-center sm:pt-28">
         {/* title */}
         <h1 className="font-pixel text-cream drop-shadow-[4px_4px_0_#1a1530]">
           <span className="block text-2xl leading-tight sm:text-4xl md:text-5xl lg:text-6xl">
@@ -74,16 +83,16 @@ export function Hero() {
           </span>
         </h1>
 
-        <p className="mt-5 max-w-xl font-body text-base text-cream/90 sm:text-lg md:text-xl">
+        <p className="mt-4 max-w-xl font-body text-sm text-cream/90 sm:mt-5 sm:text-lg md:text-xl">
           A tiny pixel coin with a big heart. Living in a little meadow
           you can poke, pet, and play with. Touch grass. Pet the coin.
           Number go up.
         </p>
 
         {/* mascot */}
-        <div ref={mascotWrapRef} className="my-6 sm:my-8" style={{ willChange: 'transform' }}>
+        <div ref={mascotWrapRef} className="my-4 sm:my-8" style={{ willChange: 'transform' }}>
           <div data-mascot>
-            <Mascot size={3.4} />
+            <Mascot size={mascotSize} />
           </div>
         </div>
 
@@ -135,7 +144,7 @@ export function Hero() {
         </div>
 
         {/* scroll hint */}
-        <div className="mt-10 flex flex-col items-center gap-1 text-cream/60">
+        <div className="mt-6 flex flex-col items-center gap-1 text-cream/60 sm:mt-10">
           <span className="font-pixel text-[0.5rem]">SCROLL TO EXPLORE</span>
           <PixelSprite
             grid={['  k  ', '  k  ', '  k  ', ' kkk ', 'kkkkk', ' kkk ', '  k  ']}
