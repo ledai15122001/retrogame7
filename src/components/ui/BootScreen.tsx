@@ -16,13 +16,15 @@ import { COIN_FRONT, PALETTE } from '@/components/sprites/sprites';
  *   3.25s  "SYSTEM READY" appears
  *   ~3.6s  blinking "► CLICK ANYWHERE TO ENTER THE ARCADE" appears (calm cursor)
  *         The screen now waits indefinitely for the player's first interaction.
- *   click  unlock audio -> start background music -> exit animation -> mount Hero
+ *   click  unlock audio -> start background music -> hand off to pixel
+ *          mosaic transition (which dissolves this screen into tiles,
+ *          revealing the Hero underneath) -> mount Hero entrance
  *
  * Respects prefers-reduced-motion (shortened to a quick fade).
  * Audio is unlocked strictly via the user's first gesture — no autoplay.
  */
 
-type Phase = 'insert' | 'booting' | 'progress' | 'flash' | 'ready' | 'awaiting' | 'done';
+type Phase = 'insert' | 'booting' | 'progress' | 'flash' | 'ready' | 'awaiting' | 'exiting' | 'done';
 
 const PROGRESS_LINES = [
   '✓ Loading Pixel World...',
@@ -43,6 +45,9 @@ const T_READY = 3250; // READY! visible
 const T_AWAITING = 3600; // blinking CTA appears (~350ms after READY)
 
 export function BootScreen({ onDone }: { onDone: () => void }) {
+  // onEnter is called immediately on click (before the dissolve) so the
+  // parent can mount the PixelTransition layer + Hero while this screen
+  // stays visible. onDone is called once the dissolve completes.
   const reduced = usePrefersReducedMotion();
   const [phase, setPhase] = useState<Phase>('insert');
   const [typedLines, setTypedLines] = useState<string[]>([]);
@@ -65,11 +70,6 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
   const doneRef = useRef(onDone);
   doneRef.current = onDone;
   const enteredRef = useRef(false);
-
-  const finish = () => {
-    window.dispatchEvent(new Event('bootscreen:finished'));
-    doneRef.current();
-  };
 
   // audio-safe helper: only play if the context can actually resume.
   const trySound = (fn: () => void) => {
@@ -226,12 +226,13 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
     sound.resume();
     sound.startMusic();
 
-    // Play the existing exit animation, then mount Hero.
+    // Immediately hide the interactive layer and notify the parent to mount
+    // the PixelTransition (which renders a snapshot of this screen and
+    // dissolves it into tiles, revealing the Hero underneath). We do NOT
+    // fade this element — the transition canvas takes over visually.
     setExit(true);
-    window.setTimeout(() => {
-      setPhase('done');
-      finish();
-    }, 450);
+    setPhase('exiting');
+    doneRef.current();
   };
 
   useEffect(() => {
@@ -247,7 +248,10 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
-  if (phase === 'done' && exit) return null;
+  // Once we've handed off to the transition, unmount this DOM tree so the
+  // Hero underneath is fully interactive. The PixelTransition canvas (which
+  // rendered a snapshot of this screen) continues the dissolve on its own.
+  if (phase === 'exiting' || phase === 'done') return null;
 
   const showInsert = phase === 'insert';
   const showBooting = phase === 'booting' || phase === 'progress';
