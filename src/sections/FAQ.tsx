@@ -87,7 +87,9 @@ export function FAQ() {
         </div>
       </div>
 
-      <HillDivider fromVar="--c-sky-mid" toVar="--c-sky-top" height={70} grassVar="--c-grass" className="mt-12" />
+      <div id="footer-hills-wrap" className="mt-12">
+        <HillDivider fromVar="--c-sky-mid" toVar="--c-sky-top" height={70} grassVar="--c-grass" />
+      </div>
     </section>
   );
 }
