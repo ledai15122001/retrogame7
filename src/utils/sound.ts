@@ -74,6 +74,49 @@ function blip(
   }
 }
 
+// ---- background music (looping chiptune) ----
+let musicTimer: number | null = null;
+let musicStep = 0;
+
+// A gentle 8-bit melody in C major, 16 steps (4 bars of 4 sixteenths).
+// null = rest. Each entry: [freq, duration in beats]
+const MELODY: Array<[number, number] | null> = [
+  [523, 1], [659, 1], [784, 1], [659, 1],
+  [523, 1], [659, 1], [784, 2],
+  [880, 1], [784, 1], [659, 1], [523, 1],
+  [440, 1], [523, 1], [659, 2],
+  [784, 1], [659, 1], [523, 1], [440, 1],
+  [392, 2], null, [523, 1], [659, 1],
+  [784, 1], [880, 1], [784, 1], [659, 1],
+  [523, 4],
+];
+const BASS: Array<[number, number] | null> = [
+  [131, 2], null, [131, 1], [165, 1],
+  [131, 2], null, [175, 1], [131, 1],
+  [175, 2], null, [175, 1], [196, 1],
+  [131, 2], null, [131, 2],
+  [131, 2], null, [131, 1], [165, 1],
+  [175, 2], null, [196, 1], [175, 1],
+  [131, 4],
+];
+
+function note(freq: number, dur: number, type: Wave, vol: number, delay: number) {
+  const ac = ensure();
+  if (!ac || !master || !enabled) return;
+  const t0 = ac.currentTime + delay;
+  const osc = ac.createOscillator();
+  const gain = ac.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, t0);
+  gain.gain.setValueAtTime(0.0001, t0);
+  gain.gain.exponentialRampToValueAtTime(vol, t0 + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  osc.connect(gain);
+  gain.connect(master);
+  osc.start(t0);
+  osc.stop(t0 + dur + 0.02);
+}
+
 export const sound = {
   setEnabled(v: boolean) {
     enabled = v;
@@ -83,6 +126,26 @@ export const sound = {
   },
   resume() {
     ensure();
+  },
+  startMusic() {
+    if (musicTimer !== null) return;
+    const ac = ensure();
+    if (!ac) return;
+    musicStep = 0;
+    const stepMs = 280; // ~107 BPM, calm arcade pace
+    musicTimer = window.setInterval(() => {
+      const mel = MELODY[musicStep % MELODY.length];
+      if (mel) note(mel[0], mel[1] * stepMs / 1000, 'square', 0.12, 0);
+      const bass = BASS[musicStep % BASS.length];
+      if (bass) note(bass[0], bass[1] * stepMs / 1000, 'triangle', 0.10, 0);
+      musicStep++;
+    }, stepMs);
+  },
+  stopMusic() {
+    if (musicTimer !== null) {
+      window.clearInterval(musicTimer);
+      musicTimer = null;
+    }
   },
   /** short tap for button hover/press */
   tap() {

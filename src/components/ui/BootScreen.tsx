@@ -7,22 +7,22 @@ import { COIN_FRONT, PALETTE } from '@/components/sprites/sprites';
 /**
  * Premium retro arcade power-on boot screen.
  *
- * Timeline (4.0s total):
+ * Timeline:
  *   0.00s  fade in from black, scanlines + flicker, coin floats, "INSERT COIN" blinks
  *   0.60s  coin drops with gravity into the coin slot -> spark + shake + metallic sound
  *   0.90s  "INSERT COIN" out, "BOOTING ARCADE SYSTEM..." typewriter in
  *   1.10s  progress lines type out one by one; loading bar fills smoothly 0->100%
  *   2.90s  100% reached -> 300ms pause -> golden flash + slot glow + PING
- *   3.25s  "READY!" pops in with sparkle particles, holds ~350ms
- *   3.60s  crossfade out, hero revealed underneath
- *   4.00s  unmount
+ *   3.25s  "SYSTEM READY" appears
+ *   ~3.6s  blinking "► CLICK ANYWHERE TO ENTER THE ARCADE" appears (calm cursor)
+ *         The screen now waits indefinitely for the player's first interaction.
+ *   click  unlock audio -> start background music -> exit animation -> mount Hero
  *
- * Always plays on every page load/refresh.
  * Respects prefers-reduced-motion (shortened to a quick fade).
- * Audio is guarded: sounds only fire if the AudioContext can resume.
+ * Audio is unlocked strictly via the user's first gesture — no autoplay.
  */
 
-type Phase = 'insert' | 'booting' | 'progress' | 'flash' | 'ready' | 'done';
+type Phase = 'insert' | 'booting' | 'progress' | 'flash' | 'ready' | 'awaiting' | 'done';
 
 const PROGRESS_LINES = [
   '✓ Loading Pixel World...',
@@ -40,8 +40,7 @@ const T_PROGRESS = 1100;
 const T_PROGRESS_END = 2900; // bar reaches 100% (fills over ~1.8s)
 const T_FLASH = 3200; // 300ms pause after 100%
 const T_READY = 3250; // READY! visible
-const T_FADE_OUT = 3600; // READY holds ~350ms then crossfade
-const T_DONE = 4000; // unmount — exactly 4.0s
+const T_AWAITING = 3600; // blinking CTA appears (~350ms after READY)
 
 export function BootScreen({ onDone }: { onDone: () => void }) {
   const reduced = usePrefersReducedMotion();
@@ -65,6 +64,7 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
   const barStartRef = useRef<number>(0);
   const doneRef = useRef(onDone);
   doneRef.current = onDone;
+  const enteredRef = useRef(false);
 
   const finish = () => {
     window.dispatchEvent(new Event('bootscreen:finished'));
@@ -88,10 +88,7 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
 
     if (reduced) {
       const t1 = window.setTimeout(() => setPhase('ready'), 200);
-      const t2 = window.setTimeout(() => {
-        setExit(true);
-        window.setTimeout(() => finish(), 260);
-      }, 500);
+      const t2 = window.setTimeout(() => setPhase('awaiting'), 400);
       return () => {
         window.clearTimeout(t1);
         window.clearTimeout(t2);
@@ -140,7 +137,7 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
       }, T_FLASH)
     );
 
-    // 2.10s — READY!
+    // 2.10s — READY! (now "SYSTEM READY")
     timers.push(
       window.setTimeout(() => {
         setPhase('ready');
@@ -149,18 +146,11 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
       }, T_READY)
     );
 
-    // 2.35s — begin fade out (crossfade)
+    // 2.35s — enter the awaiting-CTA phase (no auto-exit)
     timers.push(
       window.setTimeout(() => {
-        setExit(true);
-      }, T_FADE_OUT)
-    );
-
-    // 2.70s — unmount, hero fully visible
-    timers.push(
-      window.setTimeout(() => {
-        finish();
-      }, T_DONE)
+        setPhase('awaiting');
+      }, T_AWAITING)
     );
 
     return () => timers.forEach((t) => window.clearTimeout(t));
@@ -214,7 +204,7 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
   // ---------- loading bar smooth fill ----------
   useEffect(() => {
     if (reduced) return;
-    if (phase !== 'progress' && phase !== 'flash' && phase !== 'ready') return;
+    if (phase !== 'progress' && phase !== 'flash' && phase !== 'ready' && phase !== 'awaiting') return;
     barStartRef.current = performance.now();
     const dur = T_PROGRESS_END - T_PROGRESS; // 900ms
     const step = (now: number) => {
@@ -227,18 +217,50 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
     return () => cancelAnimationFrame(rafRef.current);
   }, [phase, reduced]);
 
-  if (exit && phase === 'done') return null;
+  // ---------- interaction gate: first click unlocks audio + exits ----------
+  const handleEnter = () => {
+    if (enteredRef.current) return;
+    enteredRef.current = true;
+
+    // Unlock audio inside the user gesture — no autoplay bypass.
+    sound.resume();
+    sound.startMusic();
+
+    // Play the existing exit animation, then mount Hero.
+    setExit(true);
+    window.setTimeout(() => {
+      setPhase('done');
+      finish();
+    }, 450);
+  };
+
+  useEffect(() => {
+    if (phase !== 'awaiting') return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        handleEnter();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
+  if (phase === 'done' && exit) return null;
 
   const showInsert = phase === 'insert';
   const showBooting = phase === 'booting' || phase === 'progress';
-  const showProgress = phase === 'progress' || phase === 'flash' || phase === 'ready';
-  const showBar = phase === 'progress' || phase === 'flash';
-  const showReady = phase === 'ready';
+  const showProgress = phase === 'progress' || phase === 'flash' || phase === 'ready' || phase === 'awaiting';
+  const showBar = phase === 'progress' || phase === 'flash' || phase === 'ready' || phase === 'awaiting';
+  const showReady = phase === 'ready' || phase === 'awaiting';
+  const showAwaiting = phase === 'awaiting';
 
   return (
     <div
       ref={rootRef}
-      className="boot-screen fixed inset-0 z-[10000] flex flex-col items-center justify-center bg-black"
+      onClick={handleEnter}
+      className={`boot-screen fixed inset-0 z-[10000] flex flex-col items-center justify-center bg-black ${phase === 'awaiting' ? 'cursor-pointer' : ''}`}
       style={{
         opacity: exit ? 0 : 1,
         transition: 'opacity 0.4s var(--ease-out-soft)',
@@ -337,7 +359,7 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
         </div>
       )}
 
-      {/* loading bar — transform-based fill (no width animation) */}
+      {/* loading bar — stays at 100% through the awaiting phase */}
       {showBar && (
         <div className="boot-bar-wrap pixel-border mt-5">
           <div
@@ -351,7 +373,7 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
         </div>
       )}
 
-      {/* READY! */}
+      {/* SYSTEM READY */}
       {showReady && (
         <div
           className="boot-ready font-pixel text-gold text-center"
@@ -360,7 +382,21 @@ export function BootScreen({ onDone }: { onDone: () => void }) {
             textShadow: '0 0 12px rgba(255,210,63,0.7), 3px 3px 0 #1a1530',
           }}
         >
-          READY!
+          SYSTEM READY
+        </div>
+      )}
+
+      {/* blinking CTA — calm, slow cursor waiting for player */}
+      {showAwaiting && (
+        <div
+          className="boot-cta font-pixel text-cream text-center boot-cta-blink"
+          style={{
+            fontSize: 'clamp(0.55rem, 2vw, 0.85rem)',
+            marginTop: 18,
+            textShadow: '0 0 8px color-mix(in srgb, var(--ui-cream) 40%, transparent)',
+          }}
+        >
+          ► CLICK ANYWHERE TO ENTER THE ARCADE
         </div>
       )}
     </div>

@@ -545,6 +545,15 @@ body,
   50%, 100% { opacity: 0.12; }
 }
 
+/* Calm "waiting for player" CTA — slower, gentler blink */
+.boot-cta-blink {
+  animation: boot-cta-blink 1.1s steps(2) infinite;
+}
+@keyframes boot-cta-blink {
+  0%, 49%   { opacity: 1; }
+  50%, 100% { opacity: 0.22; }
+}
+
 /* floating idle coin glow (before it drops) */
 .boot-coin-idle {
   animation: boot-coin-idle 1.8s ease-in-out infinite;
@@ -947,6 +956,7 @@ body,
   .coin-sparkle::before,
   .boot-coin-idle,
   .boot-blink,
+  .boot-cta-blink,
   .arcade-on .arcade-bulb {
     animation: none !important;
   }
